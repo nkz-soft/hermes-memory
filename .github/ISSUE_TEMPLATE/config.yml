@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Architecture and decision records
+    url: https://github.com/nkz-soft/hermes-memory/blob/main/ARCHITECTURE.md
+    about: Read the architecture and the ADRs before proposing a change to them.
+  - name: Project constitution
+    url: https://github.com/nkz-soft/hermes-memory/blob/main/.specify/memory/constitution.md
+    about: The principles and the technology stack every change is reviewed against.

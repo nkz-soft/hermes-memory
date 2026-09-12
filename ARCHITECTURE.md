@@ -1,7 +1,7 @@
 # Engineering Memory — Architecture
 
 Status: architecture fixed, implementation not started. The technology stack is
-deliberately undecided (see §20).
+Python, decided in ADR-004 (see §20).
 
 ## 1. Purpose
 
@@ -364,20 +364,20 @@ logged.
 5. Credentials come from environment variables or a secret store, never from
    configuration files in the repository.
 
-## 20. Deferred decisions
+## 20. Technology stack
 
-Not decided, and deliberately not decided yet:
+The stack is decided in ADR-004: Python 3.13, with a modular monolith calling an
+external Hindsight instance. The decisions this section previously deferred are
+settled there — language and runtime, import-state storage, raw archive layout,
+configuration, the command-line surface and the testing framework.
 
-* implementation language and runtime (the original draft proposed .NET/C#; that
-  is a candidate, not a decision);
-* import-state storage format;
-* raw archive layout and file formats;
-* configuration format;
-* command-line surface;
-* testing framework.
+None of it changes anything above: the stack was chosen to fit the architecture,
+not the other way round.
 
-Each will be settled when implementation starts, and none of them changes
-anything above.
+Still open, and deliberately so, are the details that only implementation can
+settle — the on-disk layout of the raw archive, the schema of the import-state
+store, and the exact command surface. They are constrained by ADR-004 rather
+than free choices, and are fixed by the first specification that needs them.
 
 ## 21. Out of scope for the MVP
 
@@ -475,3 +475,49 @@ ingestion: the bank must be created and configured before the first import, and
 changing the mission is an operation on the bank that affects everything
 extracted afterwards. Since banks are created by writes only, the provisioning
 call is also what brings the bank into existence.
+
+### ADR-004 — Python as the implementation stack
+
+**Decision.** Implement the system in Python 3.13, as a modular monolith that
+calls an external Hindsight instance over HTTP/MCP.
+
+The core is `uv` for dependencies, Typer for the command line, Pydantic v2 for
+the domain model and contracts, httpx for HTTP, SQLAlchemy 2 over SQLite for
+import state in the MVP and PostgreSQL in production, local storage for the raw
+archive in the MVP and S3/MinIO in production, Tenacity for retry, structlog and
+OpenTelemetry for observability, pytest with testcontainers for tests, FastAPI
+if and when an HTTP surface is needed, and Docker for packaging. The full table
+lives in the project constitution, which is where compliance is checked; this
+record holds the reasoning.
+
+Module layout mirrors the boundaries of §8 — `ingestion`, `normalization`,
+`sanitization`, `classification`, `archive`, `memory/{interface,hindsight}`,
+`evaluation`, `observability`, plus `cli` and `api`. Only `memory/hindsight`
+knows about Hindsight.
+
+**Rationale.** This is an AI/agent/RAG project, and that ecosystem — memory
+engines, rerankers, embedding models, evaluation tooling — appears in Python
+first, with reference implementations to match. The work ahead is largely
+experimental: different ingestion strategies, classifiers, sanitizers, retrieval
+approaches and evaluation sets, each cheap to try and often discarded. Python
+lowers the cost of that loop, and it is the shortest path both to Hindsight and
+to any replacement for it, which is what makes the exit strategy of ADR-001
+real rather than theoretical.
+
+The priority order behind the choice is explicit: time-to-experiment, then
+ecosystem access, then replaceability of components, then developer
+productivity, then raw throughput. Maximum static typing and enterprise-platform
+consistency are not the target — .NET/C#, the original draft's candidate, wins
+on those and loses on the ones that matter here.
+
+**Consequences.** Less type safety at compile time, which Principle III of the
+constitution compensates for by requiring tests first; Pydantic carries contract
+validation at the boundaries instead. Runtime throughput is lower than a
+compiled stack would give, which is acceptable because ingestion is bounded by
+LLM extraction and network calls, not by local compute. Two storage targets
+(SQLite/local now, PostgreSQL/object storage later) must sit behind the same
+interfaces from the start, or the migration becomes a rewrite.
+
+If the project later grows into a high-load multi-tenant platform, individual
+components can move to Go, .NET or Rust. Ingestion, memory and evaluation stay
+in Python: they are where experimentation continues.

@@ -22,4 +22,21 @@ desktop.ini
 # Imported history and archives (never committed)
 data/
 
-# Stack-specific entries are added once the implementation stack is chosen.
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# Local state (import state DB, archive working copies)
+*.db
+*.sqlite3

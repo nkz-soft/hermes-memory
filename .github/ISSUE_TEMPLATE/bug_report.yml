@@ -1,0 +1,100 @@
+name: Bug report
+description: Something in the import pipeline or in recall behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste secrets or raw conversation content.** This project handles private
+        engineering history; an unredacted token in an issue is a live credential, and the
+        issue tracker is public. Redact before pasting, and prefer describing the shape of
+        the data over quoting it.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: One or two sentences. What went wrong, and where.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Pipeline stage
+      description: Which stage of ARCHITECTURE.md §7 is involved, as best you can tell.
+      options:
+        - parse
+        - normalize
+        - sanitize
+        - classify
+        - enrich
+        - raw archive
+        - retain (Hindsight)
+        - recall / reflect
+        - import state and idempotency
+        - not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: History source
+      options:
+        - chatgpt
+        - claude-chat
+        - claude-code
+        - codex
+        - hermes
+        - not source-specific
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: The command you ran and the state it ran against.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected versus actual
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: input
+    id: document_id
+    attributes:
+      label: document_id
+      description: If a specific document is involved, its id — for example `chatgpt:abc-123`.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant structured log lines. Redact tokens, headers and conversation text.
+      render: text
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, OS, Hindsight version, and how Hindsight is reached.
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed credentials, tokens and raw conversation content from everything above.
+          required: true
+        - label: I checked that an issue for this does not already exist.
+          required: true
