@@ -28,8 +28,8 @@ replaceable.
 
 ## Status
 
-Architecture is fixed; implementation has not started. The technology stack is
-intentionally undecided.
+Architecture is fixed; implementation has not started. The stack is Python — a
+modular monolith calling a self-hosted Hindsight instance.
 
 The first milestone is narrow on purpose: import ChatGPT history, and have
 Hermes answer a question from it. Claude Code, Codex and other sources follow as
