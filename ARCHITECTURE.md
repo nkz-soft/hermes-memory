@@ -521,3 +521,37 @@ interfaces from the start, or the migration becomes a rewrite.
 If the project later grows into a high-load multi-tenant platform, individual
 components can move to Go, .NET or Rust. Ingestion, memory and evaluation stay
 in Python: they are where experimentation continues.
+
+### ADR-005 — Issues are taken into work locally, gated after planning
+
+**Decision.** A feature request filed as a GitHub issue is carried to a pull
+request by one local command, `/issue-to-pr <number>`, which runs Spec Kit for
+the specification and plan, stops for a human, and only then implements and
+opens the pull request. The configuration is documented in
+[`docs/workflow/issue-to-pr.md`](docs/workflow/issue-to-pr.md).
+
+**Rationale.** The alternative was a GitHub Actions workflow triggered by a
+label or a mention, which would run unattended. It was rejected on three counts:
+it needs an API key in repository secrets for a public repository whose subject
+matter is private engineering history; the Spec Kit and Superpowers skills that
+make the work compliant would have to be installed into a runner on every run;
+and the interactive steps this project depends on — `/speckit-clarify`, the
+constitution compliance statement in every plan — have no one to answer them
+there.
+
+The gate sits after planning rather than before implementation's end because
+that is where correction is cheap. A specification and a plan take minutes to
+redirect; an implementation built on a misread issue costs a review cycle and a
+rewrite. Placing it anywhere else would either surrender the correction (no
+gate) or spend a human on questions an assumption could have settled (a gate per
+step).
+
+**Consequences.** Nothing progresses while the developer's machine is off, and
+an issue cannot be picked up by filing it alone — someone runs the command. In
+exchange there are no secrets to hold, no Actions minutes, and the full local
+skill set applies. The loop keeps no state of its own: the phase is inferred
+from the git worktree and the committed plan, so a resumed session reads the
+world rather than a memory of it, at the cost of the gate having to leave its
+record as an issue comment. Work runs in a worktree outside the repository, so
+the primary checkout stays usable and two issues can proceed at once, against
+one dependency environment per worktree.

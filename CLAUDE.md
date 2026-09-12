@@ -13,6 +13,15 @@ how it complies with the principles, and justifies deviations in writing.
 All repository content — code, comments, documentation, commit messages, issue and PR text — is
 written in English.
 
+## Taking an issue into work
+
+`/issue-to-pr <number>` carries a feature-request issue to a pull request: Spec Kit for the
+specification and plan, a stop for a human, then implementation and the pull request. Work happens
+in a git worktree at `../hermes-memory-<number>`, outside this checkout. Re-running the same command
+is how the work resumes after the gate — the phase comes from the worktree and the committed plan,
+not from the conversation. [`docs/workflow/issue-to-pr.md`](docs/workflow/issue-to-pr.md) describes
+the configuration; ADR-005 records why it works this way.
+
 ## Creating issues
 
 GitHub applies `.github/ISSUE_TEMPLATE/` only to issues opened through the web form. Issues created

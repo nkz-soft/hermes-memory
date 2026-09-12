@@ -19,9 +19,18 @@ section.
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`.
 
-Feature branches are created by `/speckit-specify`, not by hand, and **never
-renamed** — the name mirrors `specs/<NNN>-<kebab-description>/`, and renaming
-one separates the branch from its specification.
+A feature branch's name is not invented: `/speckit-specify` reports it as
+`BRANCH_NAME`, mirroring the `specs/<NNN>-<kebab-description>/` directory it
+creates. Spec Kit creates the branch itself only when its `before_specify` hook
+is installed, which it is not here — so create it with that exact name
+immediately after running `/speckit-specify`:
+
+```bash
+git switch -c 001-chatgpt-import
+```
+
+Feature branches are **never renamed**: the name is how the branch, its
+specification directory and the workflow scripts find each other.
 
 Names are lowercase ASCII, hyphen-separated, describe the change and not the
 person, and stay under GitHub's 244-byte limit. One branch carries one pull
@@ -62,7 +71,7 @@ the commits in between.
 |---|---|
 | `feature/…`, `bugfix/…`, `hotfix/…` | Not in the type list; use `feat`, `fix` |
 | Renaming a Spec Kit branch | Branch no longer matches its `specs/` directory |
-| Hand-creating `002-something` | Feature numbering and directory come from `/speckit-specify` |
+| Hand-creating `002-something` | Feature numbering and directory come from `/speckit-specify`; only the `git switch -c` is yours |
 | `nkz/import-fix`, `my-changes` | Names the author or nothing; name the change |
 | Branching from the last branch you were on | Squashed history replays as a duplicated diff |
 | Two unrelated changes on one branch | They cannot be reviewed or reverted separately |
