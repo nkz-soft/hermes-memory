@@ -1,0 +1,55 @@
+name: Spec Kit task
+description: One task from a feature's tasks.md. Usually created by /speckit-taskstoissues.
+title: "T000: <task description>"
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The title must be `T<id>: <description>` — `/speckit-taskstoissues` deduplicates by
+        matching that id, so a title in any other shape produces a duplicate issue on the
+        next run.
+
+  - type: input
+    id: feature
+    attributes:
+      label: Feature
+      description: The feature directory this task belongs to.
+      placeholder: specs/001-chatgpt-import
+    validations:
+      required: true
+
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: The task line from tasks.md, with its markers stripped.
+    validations:
+      required: true
+
+  - type: input
+    id: dependencies
+    attributes:
+      label: Depends on
+      description: Task ids that must be done first, or "none".
+      placeholder: T003, T004
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: What makes this task done, including the tests that must exist.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Principles in play
+      description: Which constitution principles this task has to satisfy.
+      options:
+        - label: I. Raw archive is the source of truth
+        - label: II. Provenance and stable identity
+        - label: III. Test-first (tests written and failing before the implementation)
+        - label: IV. Replaceable boundaries (only memory/hindsight knows Hindsight)
+        - label: V. Secrets never reach the memory engine

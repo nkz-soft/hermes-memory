@@ -1,0 +1,61 @@
+name: Feature or change request
+description: Propose a change to behaviour, architecture or scope.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing or wrong today. Describe the problem, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you want to happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else would solve this, and why this proposal is preferred.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: >
+        ARCHITECTURE.md §21 lists what the MVP deliberately excludes, and §22 sequences the
+        phases. Say where this belongs.
+      options:
+        - Phase 1 — MVP, ChatGPT history reachable from Hermes
+        - Phase 2 — coding agents
+        - Phase 3 — synthesis and evaluation
+        - Currently out of scope; proposing to change that
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: governance
+    attributes:
+      label: Governance impact
+      description: Tick everything this change would touch. Any tick means a decision record is required.
+      options:
+        - label: Changes or contradicts a principle in the constitution
+        - label: Changes the technology stack fixed in ADR-004
+        - label: Changes the Hindsight contract, the bank strategy or the tag convention
+        - label: Adds a new history source (needs its own specification and ADR, per §2)
+        - label: None of the above
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How we would know it works
+      description: The observable outcome that would close this issue.
+    validations:
+      required: true
