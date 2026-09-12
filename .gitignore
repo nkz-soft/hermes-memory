@@ -1,0 +1,25 @@
+# IDEs and editors
+.idea/
+.vs/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.local.json
+
+# Logs
+*.log
+
+# Imported history and archives (never committed)
+data/
+
+# Stack-specific entries are added once the implementation stack is chosen.
