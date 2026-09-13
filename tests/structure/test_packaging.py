@@ -23,6 +23,18 @@ def _pyproject() -> dict:
     return tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
 
 
+def _distribution_name(requirement: str) -> str:
+    """The distribution name out of a PEP 508 requirement string.
+
+    Deliberately small: the declarations here are plain ``name>=version`` strings, and pulling in
+    a full requirement parser to split on the first specifier character would be a dependency
+    added to check the dependency list.
+    """
+    for separator in ("[", "<", ">", "=", "!", "~", ";", " "):
+        requirement = requirement.split(separator, 1)[0]
+    return requirement.strip().lower().replace("_", "-")
+
+
 def test_requires_python_pins_313() -> None:
     """The metadata pins exactly the one runtime the constitution fixes."""
     requires_python = _pyproject()["project"].get("requires-python")
@@ -73,17 +85,30 @@ def test_package_is_importable_from_src_layout() -> None:
     )
 
 
-def test_no_runtime_dependencies() -> None:
-    """The skeleton adds no runtime dependency (FR-011).
+EXPECTED_RUNTIME_DEPENDENCIES = frozenset({"pydantic", "pydantic-settings"})
+"""Every runtime dependency the project is allowed to declare, by distribution name.
 
-    This passes on an empty declaration and is meant to: its value is as a guard, so that the
-    first feature to add a runtime dependency has to change this test on purpose rather than
-    slipping one in. The stack table fixes which tool is used when one is needed; it does not
-    mean all of them are pinned on day one.
+The skeleton declared none, and this test asserted that. 002-environment-configuration is the
+feature that added the first two, under the sentence the previous version of this docstring wrote
+for exactly that purpose. Both are the Pydantic v2 entry the constitution's Technology Stack table
+already fixes — `pydantic-settings` is the part of it carrying `BaseSettings`, separated at the
+v1→v2 split for packaging reasons (specs/002-environment-configuration/research.md R2).
+"""
+
+
+def test_runtime_dependencies_are_exactly_the_declared_set() -> None:
+    """The runtime dependency list holds what the plans say it holds, and nothing else.
+
+    Still a guard, now with something to guard. Its value is unchanged: a dependency that
+    displaces a fixed stack entry, or that arrives with no decision behind it, has to change this
+    test on purpose rather than slipping into the lock file where nobody reads it.
     """
-    dependencies = _pyproject()["project"].get("dependencies", [])
+    declared = _pyproject()["project"].get("dependencies", [])
+    names = frozenset(_distribution_name(requirement) for requirement in declared)
 
-    assert dependencies == [], (
-        f"The project skeleton declares runtime dependencies {dependencies!r}. "
-        "Adding one is a deliberate change — update this test in the same commit."
+    assert names == EXPECTED_RUNTIME_DEPENDENCIES, (
+        f"Runtime dependencies are {sorted(names)}, expected "
+        f"{sorted(EXPECTED_RUNTIME_DEPENDENCIES)}. Adding or removing one is a deliberate change "
+        "— update this test in the same commit, and say in the pull request which decision "
+        "record permits it."
     )
