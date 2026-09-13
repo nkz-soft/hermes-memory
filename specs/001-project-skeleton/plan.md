@@ -40,7 +40,7 @@ full check set should finish in well under a minute on a warm environment.
 **Constraints**: no runtime dependency added; no credential, secret or external service touched; no
 behaviour in any module (FR-004, FR-011). CI must run on fork pull requests, so it reads no secret.
 
-**Scale/Scope**: 14 module packages, 4 checks, ~10 committed files. No feature code.
+**Scale/Scope**: 15 module packages, 4 checks, ~10 committed files. No feature code.
 
 ## Constitution Check
 
@@ -140,7 +140,8 @@ tests/
 ├── __init__.py
 └── structure/
     ├── test_module_layout.py    # Parses the constitution's tree, compares to src/
-    └── test_packaging.py        # Metadata is installed and importable, version pins agree
+    ├── test_packaging.py        # Metadata is installed and importable, version pins agree
+    └── test_ci_workflow.py      # The workflow still runs all four checks, still needs no secret
 
 .github/workflows/ci.yml     # uv sync --locked → ruff check → ruff format --check → pytest
 README.md                    # Development section: the three commands and the Python version

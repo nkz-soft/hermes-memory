@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# The four checks only read the repository. Say so, rather than inheriting the default token
+# scope — and note that nothing here reads a secret, which is what lets this workflow run
+# unchanged on a pull request from a fork.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, format and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        # Reads .python-version, the same pin a contributor's uv reads, so that a local pass and
+        # a CI pass mean the same thing.
+        run: uv python install
+
+      - name: Install the environment
+        # --locked fails when uv.lock disagrees with pyproject.toml instead of quietly
+        # re-resolving. That failure is the point of the flag.
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Tests
+        run: uv run pytest
