@@ -44,13 +44,39 @@ mkdir -p src/hermes_memory/unrecorded && touch src/hermes_memory/unrecorded/__in
 uv run pytest -k layout          # expect failure: unrecorded module
 rm -rf src/hermes_memory/unrecorded
 
-git mv src/hermes_memory/archive src/hermes_memory/archive_renamed
+mv src/hermes_memory/archive src/hermes_memory/archive_renamed
 uv run pytest -k layout          # expect failure: recorded module missing
-git mv src/hermes_memory/archive_renamed src/hermes_memory/archive
+mv src/hermes_memory/archive_renamed src/hermes_memory/archive
+
+mkdir -p src/hermes_memory/leaks
+printf 'import subprocess\n' > src/hermes_memory/leaks/mod.py
+uv run pytest -k layout          # expect failure: namespace package, unrecorded, has behaviour
+rm -rf src/hermes_memory/leaks
+
+printf 'import subprocess\n' > src/hermes_memory/api/server.py
+uv run pytest -k layout          # expect failure: behaviour in a non-__init__ module
+rm -f src/hermes_memory/api/server.py
 ```
 
-Expected: both runs fail, each naming the specific module. A check that cannot be made to fail has
-not been verified.
+Expected: every run fails, each naming the specific module. A check that cannot be made to fail has
+not been verified. The last two mutations were added after a code review found the original checks
+blind to both — a directory without an `__init__.py` still imports, and behaviour in a sibling
+module was not inspected at all.
+
+The CI workflow test earns the same treatment:
+
+```bash
+# In a scratch commit, thrown away:
+#   replace .github/workflows/ci.yml with a stub that has no `run:` steps
+uv run pytest tests/structure/test_ci_workflow.py   # expect failure: no check runs
+#   append invalid YAML to the workflow
+uv run pytest tests/structure/test_ci_workflow.py   # expect failure: GitHub would not run it
+#   repoint the pull_request trigger away from main
+uv run pytest tests/structure/test_ci_workflow.py   # expect failure: PRs to main unchecked
+```
+
+Expected: all three fail. Each of these passed against an earlier text-matching version of the
+test, which is why the workflow is now parsed as YAML.
 
 For SC-007, that the modules carry no behaviour:
 

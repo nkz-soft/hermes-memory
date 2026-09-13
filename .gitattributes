@@ -1,0 +1,13 @@
+# Normalize line endings to LF in the repository, whatever the contributor's platform.
+#
+# Everything committed so far is already LF, so this changes nothing today. It is here for
+# .python-version in particular: committed from Windows as "3.13\r\n", it would hand
+# `uv python install` the string "3.13\r" on a Linux runner, and the test that guards the pin
+# strips whitespace and so would not catch it.
+* text=auto eol=lf
+
+# Binary files git must not touch.
+*.png binary
+*.jpg binary
+*.gz binary
+*.zip binary

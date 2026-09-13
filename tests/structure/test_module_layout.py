@@ -1,9 +1,14 @@
 """The module tree on disk agrees with the module tree the constitution records.
 
-The expected list is deliberately *not* written down here. It is parsed out of
+The list this check *enforces* is not written down here. It is parsed out of
 `.specify/memory/constitution.md`, so the constitution stays the single record of that decision
-and amending it is what moves this check — rather than a second copy that drifts silently
-(research.md R3, FR-005).
+and amending it is what moves this check (research.md R3, FR-005).
+
+There is a literal list of the fifteen modules further down, in
+`test_constitution_tree_parses_to_the_recorded_modules`. It exists to pin the *parser*, not to
+enforce the layout — nothing else compares against it — so that a parser bug cannot quietly
+turn the real check into a weaker one. Amending the constitution's tree means updating that
+test in the same commit, deliberately.
 
 The invariant runs in both directions: a recorded module that is missing fails, and a package on
 disk that nothing recorded fails too.
@@ -44,7 +49,9 @@ def recorded_modules() -> frozenset[str]:
         raise ModuleTreeError(f"The constitution is missing at {CONSTITUTION}.")
 
     text = CONSTITUTION.read_text(encoding="utf-8")
-    candidates = [block for block in _FENCE.findall(text) if "├── " in block]
+    # Match on the connector's trailing "── " rather than on "├── " specifically: a tree with a
+    # single child at every level would use only "└── " and would otherwise go unrecognised.
+    candidates = [block for block in _FENCE.findall(text) if "── " in block]
 
     if len(candidates) != 1:
         raise ModuleTreeError(
@@ -81,11 +88,18 @@ def recorded_modules() -> frozenset[str]:
 
 
 def present_modules() -> frozenset[str]:
-    """Every package under the package root, as dotted paths relative to it."""
+    """Every module directory under the package root, as dotted paths relative to it.
+
+    Found by looking for directories containing *any* Python file, not by looking for
+    ``__init__.py``. A directory without one is still importable as an implicit namespace
+    package, so keying on ``__init__.py`` would let an unrecorded module — with behaviour in
+    it — sit under the package root unseen. ``test_every_module_is_a_real_package`` then
+    insists each one has its ``__init__.py``.
+    """
     return frozenset(
-        init.parent.relative_to(PACKAGE_ROOT).as_posix().replace("/", ".")
-        for init in PACKAGE_ROOT.rglob("__init__.py")
-        if init.parent != PACKAGE_ROOT
+        source.parent.relative_to(PACKAGE_ROOT).as_posix().replace("/", ".")
+        for source in PACKAGE_ROOT.rglob("*.py")
+        if source.parent != PACKAGE_ROOT
     )
 
 
@@ -123,6 +137,9 @@ def test_an_unreadable_record_fails_loudly(tmp_path, monkeypatch) -> None:
     ``test_every_recorded_module_exists`` pass on any tree at all, and the check would go on
     reporting green while enforcing nothing.
     """
+    # The dotted target below assumes pytest's default "prepend" import mode, under which this
+    # file is importable as tests.structure.test_module_layout. Switching to importmode=importlib
+    # would break these three lines — loudly, which is the acceptable kind.
     missing = tmp_path / "gone.md"
     monkeypatch.setattr("tests.structure.test_module_layout.CONSTITUTION", missing)
     with pytest.raises(ModuleTreeError):
@@ -168,20 +185,43 @@ def test_no_unrecorded_modules_exist() -> None:
     )
 
 
+def test_every_module_is_a_real_package() -> None:
+    """No module relies on being an implicit namespace package (research.md R4).
+
+    A directory of Python files without an ``__init__.py`` still imports, but it has nowhere to
+    state what boundary it is, and it makes packaging mistakes quieter rather than louder.
+    """
+    not_packages = sorted(
+        module
+        for module in present_modules()
+        if not (PACKAGE_ROOT / Path(module.replace(".", "/")) / "__init__.py").exists()
+    )
+
+    assert not not_packages, (
+        f"These directories hold Python files but no __init__.py: {not_packages}. "
+        "Add one with a docstring naming the boundary, or remove the directory."
+    )
+
+
 def test_modules_carry_no_behaviour() -> None:
     """Each module is a boundary and nothing else (FR-004, SC-007).
 
     A docstring is not behaviour; an import, a class, a function or an assignment is. This is
     what keeps the skeleton from quietly becoming an implementation.
+
+    Every ``.py`` file under the package root is inspected, not only ``__init__.py``: the guard
+    is worth nothing if behaviour can be added in a sibling module. The first feature to write
+    real code changes this test on purpose — the same deliberate-change guard that
+    ``test_no_runtime_dependencies`` uses.
     """
     offenders: list[str] = []
 
-    for init in sorted(PACKAGE_ROOT.rglob("__init__.py")):
-        body = ast.parse(init.read_text(encoding="utf-8")).body
+    for source in sorted(PACKAGE_ROOT.rglob("*.py")):
+        body = ast.parse(source.read_text(encoding="utf-8")).body
         docstring_only = len(body) <= 1 and (not body or ast.get_docstring(ast.Module(body, [])))
 
         if not docstring_only:
-            offenders.append(init.relative_to(REPO_ROOT).as_posix())
+            offenders.append(source.relative_to(REPO_ROOT).as_posix())
 
     assert not offenders, (
         f"These modules contain more than a docstring: {offenders}. "

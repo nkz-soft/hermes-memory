@@ -81,8 +81,8 @@ scenario of User Story 2 asks for.
   but there is no code yet for it to constrain. It belongs to the feature that first writes an
   import, not to the skeleton.
 
-**Parsing note**: the fence is an ASCII tree using `├──`, `└──` and `│` at two-space-per-level
-indentation. Parsing is by indentation depth and connector, and unresolved lines make the test
+**Parsing note**: the fence is an ASCII tree using `├──`, `└──` and `│` at four-characters-per-level
+indentation (`│   ` or four spaces). Parsing is by indentation depth and connector, and unresolved lines make the test
 fail; the tree is committed content that changes only by amendment, so this is deterministic.
 
 ## R4 — What "an empty module" contains

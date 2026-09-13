@@ -15,6 +15,9 @@ dependencies = []
 dev = [
     "pytest>=8",
     "ruff>=0.14",
+    # Only so that tests/structure/test_ci_workflow.py can parse the workflow instead of
+    # pattern-matching its text. Development-only; FR-011 concerns runtime dependencies.
+    "pyyaml>=6",
 ]
 
 [build-system]

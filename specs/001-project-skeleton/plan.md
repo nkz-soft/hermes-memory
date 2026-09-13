@@ -57,6 +57,19 @@ argument. Stating each anyway, because the constitution requires the plan to.
 | **IV — Replaceable Boundaries** | Engaged, and this is the feature's purpose. Every boundary of §8 gets its module before anything imports across one. No module imports another — no module imports anything at all — so no dependency direction is established that a later feature would have to undo. `memory/hindsight` and `memory/interface` exist as separate packages from the first commit, so the one place permitted to know about Hindsight is already fenced off. The import-state boundary of §8 has no module in the recorded layout and is deliberately not invented here; adding one would be an unrecorded module and the layout test would reject it. Enforcing the dependency *directions* automatically (import-linter) is deferred to the first feature that writes an import — see R3. |
 | **V — Secrets Never Reach the Memory Engine** | Engaged negatively and satisfied: no content leaves the process, no credential is read, and no file in this feature holds one. The CI workflow declares `permissions: contents: read` and consumes no repository secret, which is also what lets it run on fork pull requests. `data/` remains ignored and untouched. Gitleaks, named in the stack table, is a scanning tool rather than a skeleton component; wiring it in is a separate change and is called out under Deferred below. |
 
+**A known conflict between two binding documents, raised rather than papered over**:
+ARCHITECTURE.md §8 lists six boundaries, one of which is *Import state* — "Track what has already
+been imported". The constitution's module tree, and ADR-004's restatement of it, have no module
+for it. The constitution's Governance section is explicit that a conflict between the two
+documents "is a defect: one of the two MUST be amended rather than silently ignored."
+
+This feature does not resolve it, because resolving it means amending a binding document and the
+issue's Governance impact is "None of the above". It follows the narrower record — the module tree
+— and creates no module, which is also what the layout check enforces. **The conflict is left
+open deliberately and should be settled before the feature that needs import state starts**, not
+discovered by it. Either the tree gains an entry or §8's table gains a note saying which module
+carries that boundary.
+
 **Technology Stack compliance**: every fixed entry this feature touches is used as fixed — Python
 3.13, `uv`, pytest. It adds one tool the table does not name (Ruff) and displaces none, so the
 "changing any entry, or adding a dependency that displaces one" clause is not triggered and no new
@@ -165,6 +178,11 @@ Named here so that a reviewer can see these were considered and left out rather 
   written to be additive precisely so that adding it later is a normal change.
 - **Import-linter contracts** enforcing Principle IV's dependency directions (R3).
 - **A type checker** (R2).
+- **PyYAML** is present as a development dependency, added during code review so that the CI
+  workflow test parses the workflow rather than pattern-matching its text. The review demonstrated
+  why: the text-matching version passed on a workflow with no steps in it, because the file's own
+  comments contained the strings being searched for. FR-011 forbids a *runtime* dependency; this
+  sits in the `dev` group beside pytest and ruff.
 - **Docker packaging**, the FastAPI surface, and the metadata database — ADR-004 names them; each
   arrives with the work that needs it.
 
