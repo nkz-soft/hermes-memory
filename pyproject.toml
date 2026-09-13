@@ -1,0 +1,46 @@
+[project]
+name = "hermes-memory"
+version = "0.1.0"
+description = "Engineering memory: private conversation history, retained and recallable."
+readme = "README.md"
+license = "MIT"
+requires-python = "==3.13.*"
+dependencies = []
+
+# The skeleton adds no runtime dependency. The technology stack fixed by ADR-004 says which tool
+# is used when one is needed, not that all of them are pinned on day one; each arrives with the
+# feature that needs it. tests/structure/test_packaging.py holds this line.
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.14",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hermes_memory"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-specific rules
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]
