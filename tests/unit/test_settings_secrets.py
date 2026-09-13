@@ -138,3 +138,37 @@ def test_model_dump_json_is_safe_by_default(settings: Settings) -> None:
 
     assert payload["hindsight"]["token"] == "**********"
     assert payload["llm"]["api_key"] == "**********"
+
+
+def test_a_validator_message_cannot_carry_the_value_into_the_failure(
+    complete_environment: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`_describe` renders pydantic's `msg`, and a `ValueError` from a validator lands in it.
+
+    Nothing raises `ValueError` on a secret field today, so this locks in the property rather than
+    the current accident: the day someone adds `raise ValueError(f"bad token: {value}")`, the
+    credential would flow into the message that the rest of this file works to keep it out of.
+    """
+    from pydantic import ValidationError, field_validator
+
+    from hermes_memory.settings import Settings, _describe
+
+    class Leaky(Settings):
+        @field_validator("archive_root", mode="before")
+        @classmethod
+        def _shout_the_value(cls, value: object) -> object:
+            raise ValueError(f"refusing {HINDSIGHT_TOKEN}")
+
+    monkeypatch.setenv("HERMES_ARCHIVE_ROOT", "anything")
+
+    try:
+        Leaky(_env_file=None)  # type: ignore[call-arg]
+    except ValidationError as error:
+        rendered = _describe(error)
+    else:  # pragma: no cover - the validator always raises
+        raise AssertionError("expected the scratch validator to fail validation")
+
+    assert HINDSIGHT_TOKEN not in rendered, (
+        "A validator's own message reached the rendered failure. `_describe` must not pass "
+        "`msg` through unfiltered when a validator can interpolate a value into it."
+    )

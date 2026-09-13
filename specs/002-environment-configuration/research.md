@@ -189,6 +189,18 @@ Validation stops there. The directory is not created and its existence is not as
 SC-007 keep this feature free of side effects, and the feature that writes to the archive is the
 one that should decide what to do when it is absent.
 
+**Two cases tightened during code review**, both of which had resolved silently to something
+wrong:
+
+* A blank value — `HERMES_ARCHIVE_ROOT=` uncommented but not filled in, the likeliest mistake given
+  how `.env.example` presents it — resolved to the repository root itself, which would have put the
+  raw archive in the checkout and made the import-state path a directory. Blank is now rejected,
+  consistent with how a blank bank id is treated.
+* A relative path in a deployment that is not a source checkout resolved against whatever
+  `parents[2]` happens to be — inside `site-packages` for a non-editable install. It is now
+  rejected with a message saying to set an absolute path, which turns a silent wrong answer into a
+  startup failure.
+
 **Rejected**: leaving paths as strings (pushes resolution to every consumer); creating the
 directories during load (a side effect in a function whose whole contract is that it has none).
 

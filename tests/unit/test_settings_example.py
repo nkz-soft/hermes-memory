@@ -42,14 +42,28 @@ def parse_example(path: Path = EXAMPLE_FILE) -> dict[str, str]:
         raise ExampleFileError(f"The example environment file is missing at {path}.")
 
     variables: dict[str, str] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip().lstrip("#").strip()
-        if "=" not in stripped:
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
             continue
-        name, _, value = stripped.partition("=")
-        name = name.strip()
-        if name.isupper() and name.isidentifier():
-            variables[name] = value.strip()
+
+        commented = stripped.startswith("#")
+        declaration = _as_declaration(stripped.lstrip("#").strip())
+
+        if declaration is None:
+            # Prose in a comment is what most of this file is, and it is fine. An *uncommented*
+            # line that is not an assignment is not: skipping what it does not recognise is how a
+            # parser misses the thing it exists to find.
+            if commented:
+                continue
+            raise ExampleFileError(
+                f"{path} line {number} is neither a comment, a blank, nor NAME=value: {line!r}. "
+                "A check that quietly skips a line it cannot read is a check that a committed "
+                "credential walks straight past."
+            )
+
+        name, value = declaration
+        variables[name] = value
 
     if not variables:
         raise ExampleFileError(
@@ -58,6 +72,22 @@ def parse_example(path: Path = EXAMPLE_FILE) -> dict[str, str]:
         )
 
     return variables
+
+
+def _as_declaration(text: str) -> tuple[str, str] | None:
+    """`NAME=value` split into its halves, or `None` if this is not a declaration at all.
+
+    `export NAME=value` counts. It is live dotenv syntax — `_reject_malformed` in the settings
+    module blesses the prefix, and python-dotenv reads such a line as a real assignment — so a
+    parser that did not recognise it would skip it, and skipping is how a committed token stays
+    invisible with the suite green.
+    """
+    name, separator, value = text.removeprefix("export ").strip().partition("=")
+    name = name.strip()
+
+    if not separator or not name.isupper() or not name.isidentifier():
+        return None
+    return name, value.strip()
 
 
 def test_the_parser_fails_loudly_on_an_unreadable_record(tmp_path: Path) -> None:
@@ -117,3 +147,36 @@ def test_the_required_settings_are_not_commented_out() -> None:
         f"These required settings are commented out in .env.example: {commented}. "
         "A required setting must read as required."
     )
+
+
+def test_an_export_line_cannot_smuggle_a_credential_past_the_check(tmp_path: Path) -> None:
+    """`export NAME=value` is live dotenv syntax, so the check must see it.
+
+    `_reject_malformed` in the settings module explicitly blesses the `export ` prefix, and
+    python-dotenv reads such a line as a real assignment. A parser here that skipped it would let
+    a committed token sit in the file with the whole suite green — and this check is the only
+    thing standing between a public repository and that token, because Gitleaks is deferred.
+    """
+    path = tmp_path / ".env.example"
+    path.write_text(
+        "HERMES_HINDSIGHT__TOKEN=\nexport HERMES_HINDSIGHT__TOKEN=sk-a-real-looking-token\n",
+        encoding="utf-8",
+    )
+
+    assert parse_example(path)["HERMES_HINDSIGHT__TOKEN"] == "sk-a-real-looking-token"
+
+
+def test_a_line_the_parser_cannot_classify_fails_rather_than_being_skipped(
+    tmp_path: Path,
+) -> None:
+    """Everywhere else in this feature an unreadable line is a failure; here too.
+
+    Silently skipping is the wrong default for a check whose job is to notice what is in a file.
+    """
+    path = tmp_path / ".env.example"
+    path.write_text(
+        "HERMES_HINDSIGHT__TOKEN=\nnot a variable assignment at all\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ExampleFileError):
+        parse_example(path)

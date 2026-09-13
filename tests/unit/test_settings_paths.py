@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_memory.settings import PROJECT_ROOT, load_settings
+from hermes_memory.settings import PROJECT_ROOT, SettingsError, load_settings
 
 
 def test_relative_paths_resolve_against_the_project_root(
@@ -95,3 +95,26 @@ def test_loading_opens_no_socket(complete_environment: dict[str, str]) -> None:
         load_settings(env_file=None)
     finally:
         socket.socket.connect = original  # type: ignore[method-assign]
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+@pytest.mark.parametrize("variable", ["HERMES_ARCHIVE_ROOT", "HERMES_IMPORT_STATE_PATH"])
+def test_a_blank_path_is_rejected_not_resolved_to_the_project_root(
+    variable: str,
+    blank: str,
+    complete_environment: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An uncommented-but-unfilled line must not silently mean the repository root.
+
+    `.env.example` ships these two commented out as `#NAME=`, so the likeliest operator mistake is
+    uncommenting without filling in. Resolving "" against the project root would put the raw
+    archive — Principle I's source of truth — in the checkout, and make the import-state path a
+    directory. Blank is rejected here for the same reason it is rejected for the bank id.
+    """
+    monkeypatch.setenv(variable, blank)
+
+    with pytest.raises(SettingsError) as failure:
+        load_settings(env_file=None)
+
+    assert variable in str(failure.value)

@@ -22,7 +22,16 @@ PACKAGE_ROOT = REPO_ROOT / "src" / "hermes_memory"
 SETTINGS_MODULE = PACKAGE_ROOT / "settings.py"
 
 ENVIRONMENT_READERS = {"getenv", "environ", "environb"}
-"""Names through which a module could reach the process environment."""
+"""Names through which a module could reach the process environment directly."""
+
+ENVIRONMENT_READING_MODULES = {"pydantic_settings", "dotenv"}
+"""Imports that read the environment on a module's behalf.
+
+`os.environ` is the obvious violation and the least likely one. In a project whose stack already
+includes `pydantic-settings`, the realistic way a second module starts reading configuration is by
+declaring a `BaseSettings` subclass of its own — or calling `load_dotenv()`. FR-001 is about one
+source of configuration, not about one spelling of the word `environ`.
+"""
 
 
 def _git(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -88,8 +97,23 @@ def _environment_readers(source: Path) -> list[str]:
                 for alias in node.names
                 if alias.name in ENVIRONMENT_READERS
             )
+        elif isinstance(node, ast.ImportFrom) and _root_module(node.module) in (
+            ENVIRONMENT_READING_MODULES
+        ):
+            found.append(f"from {node.module} import ... (line {node.lineno})")
+        elif isinstance(node, ast.Import):
+            found.extend(
+                f"import {alias.name} (line {node.lineno})"
+                for alias in node.names
+                if _root_module(alias.name) in ENVIRONMENT_READING_MODULES
+            )
 
     return found
+
+
+def _root_module(name: str | None) -> str:
+    """The top-level package of a dotted module name."""
+    return (name or "").split(".", 1)[0]
 
 
 @pytest.mark.parametrize(
@@ -148,3 +172,30 @@ def test_the_settings_module_is_the_one_that_does_read_it() -> None:
     """
     assert SETTINGS_MODULE.exists()
     assert "pydantic_settings" in SETTINGS_MODULE.read_text(encoding="utf-8")
+
+
+def test_a_second_settings_class_would_be_caught(tmp_path: Path) -> None:
+    """The realistic violation is not `os.environ` — it is a second `BaseSettings`.
+
+    A module that declares its own settings class, or calls `load_dotenv()`, reads the environment
+    just as surely as one touching `os.environ`, and is far likelier in a project whose stack
+    already includes `pydantic-settings`. FR-001 is about one source of configuration, not about
+    one spelling of the word `environ`.
+    """
+    offender = tmp_path / "offender.py"
+    offender.write_text(
+        '"""A module with configuration ideas of its own."""\n'
+        "from pydantic_settings import BaseSettings\n\n\n"
+        "class Extra(BaseSettings):\n"
+        "    value: str = 'x'\n",
+        encoding="utf-8",
+    )
+
+    assert _environment_readers(offender)
+
+    dotenv_user = tmp_path / "dotenv_user.py"
+    dotenv_user.write_text(
+        '"""Another way in."""\nimport dotenv\n\ndotenv.load_dotenv()\n', encoding="utf-8"
+    )
+
+    assert _environment_readers(dotenv_user)

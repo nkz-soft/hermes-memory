@@ -10,6 +10,8 @@ whether the developer running the suite happens to have a `.env` in their checko
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -125,3 +127,29 @@ def test_the_loaded_object_is_immutable(complete_environment: dict[str, str]) ->
 def test_load_settings_returns_a_settings_object(complete_environment: dict[str, str]) -> None:
     """The entry point returns the whole validated object, never a partial one."""
     assert isinstance(load_settings(env_file=None), Settings)
+
+
+def test_an_unreadable_env_file_raises_the_boundary_error(tmp_path) -> None:
+    """A `.env` that cannot be decoded fails as `SettingsError`, not as a raw decode error.
+
+    contracts/settings.md promises callers one error type to catch at startup. A bare
+    `UnicodeDecodeError` escaping past it means an unhandled traceback — and a traceback whose
+    frames hold the contents of a file full of credentials.
+    """
+    path = tmp_path / ".env"
+    path.write_bytes(b"HERMES_HINDSIGHT__BASE_URL=\xff\xfe\x00binary\n")
+
+    with pytest.raises(SettingsError) as failure:
+        load_settings(env_file=path)
+
+    assert str(path) in str(failure.value)
+    assert failure.value.__cause__ is None
+    assert failure.value.__context__ is None
+
+
+def test_the_settings_object_itself_is_immutable(complete_environment: dict[str, str]) -> None:
+    """The contract row is about the top-level object, not only the nested groups."""
+    settings = load_settings(env_file=None)
+
+    with pytest.raises(ValidationError):
+        settings.archive_root = Path("/elsewhere")  # type: ignore[misc]

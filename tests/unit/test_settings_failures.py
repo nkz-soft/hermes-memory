@@ -8,8 +8,13 @@ is added.
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
-from hermes_memory.settings import SettingsError, load_settings
+from hermes_memory.settings import (
+    SettingsError,
+    environment_variable_names,
+    load_settings,
+)
 
 REQUIRED_VARIABLES = ("HERMES_HINDSIGHT__BASE_URL", "HERMES_LLM__BASE_URL")
 """The settings with no default. Pinned literally because a *test* that derives what it checks
@@ -24,8 +29,6 @@ def test_the_required_set_is_what_the_settings_declare(
     This is what keeps the parametrized tests below honest: if a default were quietly added to a
     required setting, or removed from a defaulted one, this notices.
     """
-    from hermes_memory.settings import environment_variable_names
-
     actually_required = set()
     for variable in environment_variable_names():
         environment = {k: v for k, v in complete_environment.items() if k != variable}
@@ -125,8 +128,6 @@ def test_the_failure_is_settings_error_not_validation_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Callers catch one error type, and it is ours — which is what keeps inputs out of it."""
-    from pydantic import ValidationError
-
     with pytest.raises(SettingsError) as failure:
         load_settings(env_file=None)
 

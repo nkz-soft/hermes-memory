@@ -36,6 +36,12 @@ first one only. That is US2 and SC-002.
 HERMES_HINDSIGHT__BANK_ID=scratch uv run python -c "from hermes_memory.settings import load_settings; print(load_settings().hindsight.bank_id)"
 ```
 
+The variable-prefix form is bash. In PowerShell, set it first:
+
+```powershell
+$env:HERMES_HINDSIGHT__BANK_ID = "scratch"; uv run python -c "from hermes_memory.settings import load_settings; print(load_settings().hindsight.bank_id)"
+```
+
 Expected: `scratch`, whatever `.env` says. That is FR-004.
 
 ## 5. Nothing local is tracked
