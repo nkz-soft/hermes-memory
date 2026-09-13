@@ -42,12 +42,12 @@ declares no `requires-python` pin, no `.python-version`, no `src/` package disco
 configuration and no README section — precisely so that the tests in Phase 3 fail for real
 reasons rather than passing by accident. Completing the metadata is US1's job, in Phase 3.
 
-- [ ] T001 Create a minimal `pyproject.toml` at the repository root: `[project]` with `name =
+- [x] T001 Create a minimal `pyproject.toml` at the repository root: `[project]` with `name =
   "hermes-memory"` and `version = "0.1.0"` only, plus a `dev` dependency group containing `pytest`
   and `ruff`. No `requires-python`, no build backend, no tool configuration — those are T009–T011.
-- [ ] T002 Run `uv sync` to generate `uv.lock`, and confirm `uv run pytest --version` executes.
-- [ ] T003 [P] Create `tests/__init__.py` and `tests/structure/__init__.py`, both empty.
-- [ ] T004 [P] Add `.venv/`, `__pycache__/`, `*.egg-info/`, `.pytest_cache/` and `.ruff_cache/` to
+- [x] T002 Run `uv sync` to generate `uv.lock`, and confirm `uv run pytest --version` executes.
+- [x] T003 [P] Create `tests/__init__.py` and `tests/structure/__init__.py`, both empty.
+- [x] T004 [P] Add `.venv/`, `__pycache__/`, `*.egg-info/`, `.pytest_cache/` and `.ruff_cache/` to
   `.gitignore` if not already ignored. Confirm `data/` is still ignored and untouched.
 
 **Checkpoint**: `uv run pytest` executes and exits 5 (no tests collected). That is the expected
@@ -75,19 +75,19 @@ test command. Both succeed with no further steps (quickstart.md Scenario 1).
 
 ### Tests for User Story 1 ⚠️ WRITE FIRST, OBSERVE FAILING
 
-- [ ] T005 [P] [US1] Write `tests/structure/test_packaging.py::test_requires_python_pins_313`:
+- [x] T005 [P] [US1] Write `tests/structure/test_packaging.py::test_requires_python_pins_313`:
   reads `pyproject.toml` and asserts `project.requires-python` is exactly `==3.13.*`, the value
   fixed by the constitution's Technology Stack table. **Run it. It must fail** — T001 declared no
   `requires-python`.
-- [ ] T006 [P] [US1] Add `test_python_version_file_agrees_with_metadata` to
+- [x] T006 [P] [US1] Add `test_python_version_file_agrees_with_metadata` to
   `tests/structure/test_packaging.py`: asserts `.python-version` exists, contains exactly `3.13`
   (stripped), and that the version it names satisfies `project.requires-python`. **Run it. It must
   fail** — there is no `.python-version` yet. This is the assertion behind FR-009.
-- [ ] T007 [P] [US1] Add `test_package_is_importable_from_src_layout` to
+- [x] T007 [P] [US1] Add `test_package_is_importable_from_src_layout` to
   `tests/structure/test_packaging.py`: asserts `hermes_memory` imports, and that its resolved
   `__file__` lies under a `src/` directory — proving the installed package, not the working
   directory, is what is under test (research.md R1). **Run it. It must fail** — no package exists.
-- [ ] T008 [P] [US1] Add `test_no_runtime_dependencies` to `tests/structure/test_packaging.py`:
+- [x] T008 [P] [US1] Add `test_no_runtime_dependencies` to `tests/structure/test_packaging.py`:
   asserts `project.dependencies` is absent or empty, enforcing FR-011 — the skeleton adds no
   runtime dependency, and a later feature that adds one must change this test deliberately. **Run
   it. It must fail or error** on the current metadata; if it passes trivially, note that in the
@@ -95,22 +95,22 @@ test command. Both succeed with no further steps (quickstart.md Scenario 1).
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Complete `pyproject.toml`: add `requires-python = "==3.13.*"`, a build backend
+- [x] T009 [US1] Complete `pyproject.toml`: add `requires-python = "==3.13.*"`, a build backend
   with `src/` package discovery for `hermes_memory`, and an explicitly empty
   `dependencies = []`. Satisfies T005, T007 (in part) and T008.
-- [ ] T010 [US1] Create `.python-version` containing `3.13`. Satisfies T006.
-- [ ] T011 [P] [US1] Add `[tool.ruff]` to `pyproject.toml` — target version `py313`, a line length,
+- [x] T010 [US1] Create `.python-version` containing `3.13`. Satisfies T006.
+- [x] T011 [P] [US1] Add `[tool.ruff]` to `pyproject.toml` — target version `py313`, a line length,
   and an explicit rule selection — and `[tool.pytest.ini_options]` with `testpaths = ["tests"]`,
   `--strict-markers` and `--strict-config`, so a mistyped marker or option is an error rather than
   a silent no-op (data-model.md → Project metadata).
-- [ ] T012 [US1] Create `src/hermes_memory/__init__.py` with a one-line docstring naming the
+- [x] T012 [US1] Create `src/hermes_memory/__init__.py` with a one-line docstring naming the
   distribution. Satisfies T007. **Run the packaging tests. All four must now pass.**
-- [ ] T013 [US1] Re-run `uv sync` so `uv.lock` reflects the completed metadata, and verify
+- [x] T013 [US1] Re-run `uv sync` so `uv.lock` reflects the completed metadata, and verify
   `uv sync --locked` exits 0 — check C1 of [contracts/checks.md](contracts/checks.md).
-- [ ] T014 [US1] Add a "Development" section to `README.md` with the required Python version and
+- [x] T014 [US1] Add a "Development" section to `README.md` with the required Python version and
   the three commands verbatim: `uv sync`, `uv run pytest`, `uv run ruff check . && uv run ruff
   format --check .` (FR-010, research.md R7).
-- [ ] T015 [US1] Run `uv run ruff check .` and `uv run ruff format --check .` over the tree and fix
+- [x] T015 [US1] Run `uv run ruff check .` and `uv run ruff format --check .` over the tree and fix
   what they report — checks C2 and C3.
 
 **Checkpoint**: a clean clone reaches a green suite using only the README's commands. US1 is
@@ -128,41 +128,41 @@ fail by adding an unrecorded package or renaming a recorded one (quickstart.md S
 
 ### Tests for User Story 2 ⚠️ WRITE FIRST, OBSERVE FAILING
 
-- [ ] T016 [US2] Write the parser in `tests/structure/test_module_layout.py`: a helper that reads
+- [x] T016 [US2] Write the parser in `tests/structure/test_module_layout.py`: a helper that reads
   `.specify/memory/constitution.md`, locates the single fenced `text` block containing the module
   tree, and parses its `├── / └── / │` ASCII tree by indentation depth into a set of dotted module
   paths. **It must raise rather than return an empty set** when the fence cannot be found or a line
   cannot be resolved (research.md R3) — a check that passes vacuously is worse than none.
-- [ ] T017 [US2] Add `test_constitution_tree_parses_to_the_recorded_modules`: asserts the parser
+- [x] T017 [US2] Add `test_constitution_tree_parses_to_the_recorded_modules`: asserts the parser
   returns exactly the fifteen paths recorded in [data-model.md](data-model.md) → Module — `api`,
   `cli`, `ingestion`, `ingestion.chatgpt`, `ingestion.claude_code`, `ingestion.codex`,
   `normalization`, `sanitization`, `classification`, `archive`, `memory`, `memory.interface`,
   `memory.hindsight`, `evaluation`, `observability`. This pins the parser itself, so a parser bug
   cannot silently weaken the layout check. **Run it. It must fail** — no parser exists yet.
-- [ ] T018 [US2] Add `test_every_recorded_module_exists`: for each parsed path, asserts the
+- [x] T018 [US2] Add `test_every_recorded_module_exists`: for each parsed path, asserts the
   corresponding directory under `src/hermes_memory/` exists and contains an `__init__.py`. The
   failure message names the missing modules. **Run it. It must fail** — only the package root
   exists.
-- [ ] T019 [US2] Add `test_no_unrecorded_modules_exist`: walks the packages under
+- [x] T019 [US2] Add `test_no_unrecorded_modules_exist`: walks the packages under
   `src/hermes_memory/`, and asserts every one appears in the parsed set. The failure message names
   the surplus packages. This is the second direction of the FR-005 invariant. **Run it.** It may
   pass trivially on an empty tree; T023 is where it is proven capable of failing.
-- [ ] T020 [US2] Add `test_modules_carry_no_behaviour`: asserts every `__init__.py` under
+- [x] T020 [US2] Add `test_modules_carry_no_behaviour`: asserts every `__init__.py` under
   `src/hermes_memory/` contains nothing but a module docstring — no import, no class, no function,
   no assignment (FR-004, SC-007, research.md R4). **Run it. It must fail or pass vacuously**; it
   becomes meaningful in T022.
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] Create the fifteen module directories under `src/hermes_memory/` exactly as
+- [x] T021 [US2] Create the fifteen module directories under `src/hermes_memory/` exactly as
   recorded: `api/`, `cli/`, `ingestion/{chatgpt,claude_code,codex}/`, `normalization/`,
   `sanitization/`, `classification/`, `archive/`, `memory/{interface,hindsight}/`, `evaluation/`,
   `observability/`. Create no other package — in particular, do not add one for the import-state
   boundary of ARCHITECTURE.md §8, which the recorded layout does not carry (plan.md → Principle IV).
-- [ ] T022 [US2] Give each new `__init__.py` a single one-line docstring naming that boundary's
+- [x] T022 [US2] Give each new `__init__.py` a single one-line docstring naming that boundary's
   responsibility, taken from ARCHITECTURE.md §8 where §8 names it. Nothing else in the file.
   **Run the layout tests. All five must now pass.**
-- [ ] T023 [US2] Prove the check can fail, per quickstart.md Scenario 2: temporarily add
+- [x] T023 [US2] Prove the check can fail, per quickstart.md Scenario 2: temporarily add
   `src/hermes_memory/unrecorded/__init__.py` and confirm T019 fails naming it; remove it. Then
   temporarily rename `src/hermes_memory/archive/` and confirm T018 fails naming it; rename it back.
   Record both observed failures in the commit message. Leave the tree clean.
@@ -186,7 +186,7 @@ CI cannot be unit-tested — the only honest proof is a pull request that runs i
 What *can* be asserted locally is that the workflow keeps the promises the contract makes about it,
 and those assertions are worth having because they are what silently rot.
 
-- [ ] T024 [P] [US3] Write `tests/structure/test_ci_workflow.py`: parses
+- [x] T024 [P] [US3] Write `tests/structure/test_ci_workflow.py`: parses
   `.github/workflows/ci.yml` and asserts it triggers on `pull_request` against `main`; runs all
   four commands of [contracts/checks.md](contracts/checks.md), with `uv sync` carrying `--locked`;
   declares `permissions: contents: read`; and references no `secrets.` expression, which is what
@@ -195,13 +195,13 @@ and those assertions are worth having because they are what silently rot.
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Create `.github/workflows/ci.yml` per research.md R5: triggers on `pull_request`
+- [x] T025 [US3] Create `.github/workflows/ci.yml` per research.md R5: triggers on `pull_request`
   targeting `main` and `push` to `main`; one job on `ubuntu-latest`; a concurrency group keyed on
   the ref that cancels superseded runs; `permissions: contents: read`; steps — checkout, install
   `uv` at a pinned action version, install the Python version from `.python-version`,
   `uv sync --locked`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`.
   **Run T024. It must now pass.**
-- [ ] T026 [US3] Run every one of the four checks locally in the workflow's order and confirm each
+- [x] T026 [US3] Run every one of the four checks locally in the workflow's order and confirm each
   exits 0, so that what CI will run has already been run by hand.
 
 **Checkpoint**: the workflow exists and its promises are asserted. Confirmation that it *reports*
@@ -217,17 +217,17 @@ comes from the pull request itself.
   with an unused import in one module and confirm C2 turns the pull request red; push one with a
   deliberately false assertion and confirm C4 does. Revert both. Quote the observed failures in the
   pull request's verification section rather than claiming the checks work.
-- [ ] T029 [P] Verify the lock file is binding (quickstart.md Scenario 3): add a dependency line to
+- [x] T029 [P] Verify the lock file is binding (quickstart.md Scenario 3): add a dependency line to
   `pyproject.toml` without regenerating the lock, confirm `uv sync --locked` fails rather than
   re-resolving, then restore the file.
-- [ ] T030 [P] Run `find src/hermes_memory -name '__init__.py' -size +200c` and confirm no output,
+- [x] T030 [P] Run `find src/hermes_memory -name '__init__.py' -size +200c` and confirm no output,
   the independent check on SC-007.
-- [ ] T031 Correct `plan.md` → Technical Context → Scale/Scope: it says "14 module packages"; the
+- [x] T031 Correct `plan.md` → Technical Context → Scale/Scope: it says "14 module packages"; the
   recorded layout has fifteen. Fix the number rather than leaving the plan disagreeing with what
   was built.
-- [ ] T032 Walk [quickstart.md](quickstart.md) end to end from a fresh clone and confirm every
+- [x] T032 Walk [quickstart.md](quickstart.md) end to end from a fresh clone and confirm every
   expected outcome, including that no step outside the README was needed — SC-001.
-- [ ] T033 Request a code review of the finished branch and address what it finds before a human
+- [x] T033 Request a code review of the finished branch and address what it finds before a human
   sees it.
 
 ---
