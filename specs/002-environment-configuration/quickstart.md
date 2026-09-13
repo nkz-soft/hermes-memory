@@ -24,7 +24,7 @@ Expected: the settings print with resolved absolute paths and the bank id `engin
 ## 3. A missing required value fails at startup
 
 ```bash
-uv run python -c "from hermes_memory.settings import load_settings; load_settings(_env_file=None)"
+uv run python -c "from hermes_memory.settings import load_settings; load_settings(env_file=None)"
 ```
 
 Expected: a failure naming `HERMES_HINDSIGHT__BASE_URL` and `HERMES_LLM__BASE_URL` — both, not the

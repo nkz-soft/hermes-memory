@@ -85,6 +85,22 @@ fed a bad value, and it is what tells us whether an explicit guard is needed on 
 If it is, the guard is part of this feature; if it is not, the test stays as the regression that
 notices a future Pydantic release changing its mind.
 
+**Answered during implementation: `SecretStr` does not cover it, and a guard was needed.** A raw
+`ValidationError` renders the input verbatim — `Input should be a valid string [type=string_type,
+input_value=12345, input_type=int]` — for a `SecretStr` field as readily as for any other. The
+secret type governs how the *model* renders a value it accepted; it has nothing to say about how
+the validation machinery reports one it rejected.
+
+Two consequences, both in `load_settings`:
+
+1. A `ValidationError` never escapes. It is caught and re-raised as `SettingsError`, whose message
+   is built from `loc`, `msg` and `type` only. The `input` is dropped.
+2. The re-raise happens **after** the `except` block, not inside it. `raise ... from None` clears
+   `__cause__` but leaves the original hanging off `__context__`, where a logger rendering the
+   exception chain finds it — the credential included. Once the handler has exited there is no
+   context to attach. `test_the_exception_chain_is_severed` was observed to fail against the
+   `from None` version, which is how this was found rather than assumed.
+
 `get_secret_value()` is the deliberate accessor FR-008 requires: obtaining the credential is a
 visible act at the call site, which is what makes a review able to see it.
 

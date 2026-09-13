@@ -203,27 +203,71 @@ def test_every_module_is_a_real_package() -> None:
     )
 
 
-def test_modules_carry_no_behaviour() -> None:
-    """Each module is a boundary and nothing else (FR-004, SC-007).
+def _holds_only_a_docstring(source: Path) -> bool:
+    """Whether a source file contains nothing but its own docstring.
 
-    A docstring is not behaviour; an import, a class, a function or an assignment is. This is
-    what keeps the skeleton from quietly becoming an implementation.
-
-    Every ``.py`` file under the package root is inspected, not only ``__init__.py``: the guard
-    is worth nothing if behaviour can be added in a sibling module. The first feature to write
-    real code changes this test on purpose — the same deliberate-change guard that
-    ``test_no_runtime_dependencies`` uses.
+    A docstring is not behaviour; an import, a class, a function or an assignment is.
     """
-    offenders: list[str] = []
+    body = ast.parse(source.read_text(encoding="utf-8")).body
+    return len(body) <= 1 and bool(not body or ast.get_docstring(ast.Module(body, [])))
 
-    for source in sorted(PACKAGE_ROOT.rglob("*.py")):
-        body = ast.parse(source.read_text(encoding="utf-8")).body
-        docstring_only = len(body) <= 1 and (not body or ast.get_docstring(ast.Module(body, [])))
 
-        if not docstring_only:
-            offenders.append(source.relative_to(REPO_ROOT).as_posix())
+def _recorded_module_sources() -> list[Path]:
+    """Every ``.py`` file inside a module the constitution records.
+
+    Every file in those directories is inspected, not only ``__init__.py``: the guard is worth
+    nothing if behaviour can be added in a sibling module inside the same boundary.
+    """
+    return sorted(
+        source
+        for module in recorded_modules()
+        for source in (PACKAGE_ROOT / Path(module.replace(".", "/"))).rglob("*.py")
+    )
+
+
+def test_recorded_modules_carry_no_behaviour() -> None:
+    """Each recorded module is a boundary and nothing else (FR-004, SC-007).
+
+    **Narrowed by 002-environment-configuration, deliberately.** The previous version walked every
+    ``.py`` under the package root, and its own docstring said "The first feature to write real
+    code changes this test on purpose" — this is that feature, and `settings.py` is that code.
+
+    What the narrowing keeps is the part that was doing the work: the fifteen boundaries of
+    ARCHITECTURE.md §8 still have to be empty, so `archive/` or `memory/hindsight/` cannot grow an
+    implementation without a feature deciding to. What it gives up is the accidental coverage of
+    top-level modules, which is not where the boundaries are — `settings.py` is configuration,
+    consumed by every boundary and owned by none
+    (specs/002-environment-configuration/research.md R1).
+
+    ``test_the_behaviour_guard_still_bites`` below proves the narrowed version still fails on the
+    case it exists for.
+    """
+    offenders = [
+        source.relative_to(REPO_ROOT).as_posix()
+        for source in _recorded_module_sources()
+        if not _holds_only_a_docstring(source)
+    ]
 
     assert not offenders, (
         f"These modules contain more than a docstring: {offenders}. "
         "The skeleton establishes boundaries; behaviour arrives with the feature that needs it."
     )
+
+
+def test_the_behaviour_guard_still_bites(tmp_path, monkeypatch) -> None:
+    """Behaviour placed inside a recorded module is still caught after the narrowing.
+
+    A weakened assertion that nobody has seen fail is a weakened assertion nobody knows about.
+    This builds a package root holding one recorded module with real code in it, and insists the
+    guard reports it.
+    """
+    fake_root = tmp_path / "hermes_memory"
+    (fake_root / "archive").mkdir(parents=True)
+    (fake_root / "archive" / "__init__.py").write_text('"""A boundary."""\n', encoding="utf-8")
+    (fake_root / "archive" / "store.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    monkeypatch.setattr("tests.structure.test_module_layout.PACKAGE_ROOT", fake_root)
+    monkeypatch.setattr("tests.structure.test_module_layout.REPO_ROOT", tmp_path)
+
+    with pytest.raises(AssertionError, match=re.escape("archive/store.py")):
+        test_recorded_modules_carry_no_behaviour()

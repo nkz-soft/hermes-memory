@@ -53,6 +53,28 @@ The module tree under `src/hermes_memory/` mirrors the layout recorded in the
 [constitution](.specify/memory/constitution.md); a test parses that record and
 fails if the two disagree in either direction.
 
+## Configuration
+
+Everything the project reads from its environment is listed in
+[`.env.example`](.env.example). Copy it and fill in your own values:
+
+```bash
+cp .env.example .env
+```
+
+Two variables are required — `HERMES_HINDSIGHT__BASE_URL`, your self-hosted
+Hindsight instance, and `HERMES_LLM__BASE_URL`, the OpenAI-compatible endpoint
+extraction is routed through. Everything else has a working default. Tokens are
+optional, because a local instance may run unauthenticated.
+
+`.env` is ignored by git and must never be committed; credentials come from the
+environment or from that untracked file, never from a file in the repository. A
+real environment variable overrides the file, which is how to change one value
+for a single run.
+
+A missing or malformed setting fails at startup, naming every variable at fault,
+rather than partway through an import.
+
 ## Documentation
 
 [ARCHITECTURE.md](ARCHITECTURE.md) — scope, boundaries, memory bank strategy,
