@@ -22,6 +22,9 @@ desktop.ini
 # Imported history and archives (never committed)
 data/
 
+# Worktrees created by /issue-to-pr, one per issue
+.claude/worktrees/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -17,7 +17,8 @@ written in English.
 
 `/issue-to-pr <number>` carries a feature-request issue to a pull request: Spec Kit for the
 specification and plan, a stop for a human, then implementation and the pull request. Work happens
-in a git worktree at `../hermes-memory-<number>`, outside this checkout. Re-running the same command
+in a git worktree at `.claude/worktrees/<number>`, inside this checkout but ignored by git, so the
+file tools reach it without a prompt per file. Re-running the same command
 is how the work resumes after the gate — the phase comes from the worktree and the committed plan,
 not from the conversation. [`docs/workflow/issue-to-pr.md`](docs/workflow/issue-to-pr.md) describes
 the configuration; ADR-005 records why it works this way.
