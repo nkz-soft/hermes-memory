@@ -261,7 +261,7 @@ identifiers tying it to that span.
 - [X] T029 Run every step of [quickstart.md](quickstart.md) by hand and confirm each expected
   outcome, including step 4's `author` field surviving and step 5's token staying redacted with the
   flag on.
-- [ ] T030 Run `uv run pytest`, `uv run ruff check .` and `uv run ruff format --check .`; quote the
+- [X] T030 Run `uv run pytest`, `uv run ruff check .` and `uv run ruff format --check .`; quote the
   output in the pull request's verification section rather than asserting that they passed.
 
 ---
