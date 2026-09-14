@@ -552,6 +552,10 @@ exchange there are no secrets to hold, no Actions minutes, and the full local
 skill set applies. The loop keeps no state of its own: the phase is inferred
 from the git worktree and the committed plan, so a resumed session reads the
 world rather than a memory of it, at the cost of the gate having to leave its
-record as an issue comment. Work runs in a worktree outside the repository, so
-the primary checkout stays usable and two issues can proceed at once, against
-one dependency environment per worktree.
+record as an issue comment. Work runs in a worktree of its own, so the primary
+checkout stays usable and two issues can proceed at once, against one dependency
+environment per worktree. That worktree sits inside the checkout, at
+`.claude/worktrees/<number>` and excluded by `.gitignore`, rather than beside
+it: a path outside the working directory costs a permission prompt on every file
+the run touches, which would leave the loop stopping far more often than at its
+one intended gate.

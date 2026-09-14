@@ -16,7 +16,7 @@ configured, so the same setup can be reproduced in another repository.
 /issue-to-pr 42
   │
   ├─ Phase 0   gh issue view 42 → fields of the feature-request template
-  │            git worktree add --detach ../<repo>-42 origin/main
+  │            git worktree add --detach .claude/worktrees/42 origin/main
   │            gh issue edit 42 --add-label in-progress
   │
   ├─ Phase 1   /speckit-specify   → specs/<NNN>-<slug>/spec.md, reports BRANCH_NAME
@@ -39,6 +39,20 @@ repository: no worktree means Phase 0, a worktree without a committed `plan.md`
 means Phase 1 resuming, a worktree with one means Phase 2 is due. Re-running the
 command is therefore how the work is resumed after the gate, in the same session
 or a later one.
+
+## Where the work happens
+
+Each issue gets its own worktree at `.claude/worktrees/<number>`, inside the
+primary checkout and excluded by `.gitignore`. Inside is deliberate: Claude Code
+prompts for permission on every file it touches outside the session's working
+directory, and a run that edits dozens of files outside it turns into dozens of
+prompts. A path under the checkout is already in scope, so the loop runs without
+them — and the gate, which is the one stop that should require a person, stays
+the only one.
+
+Being ignored keeps the worktree out of everything that honours `.gitignore` —
+`git status` in the primary checkout, `ruff check .` — and `pytest` is confined
+to `testpaths = ["tests"]`, so it does not descend into the copies either.
 
 ## What the gate is for
 
@@ -71,6 +85,7 @@ gh label create in-progress --color FBCA04 --description "Claude is working on t
 |---|---|
 | [`.claude/skills/issue-to-pr/SKILL.md`](../../.claude/skills/issue-to-pr/SKILL.md) | the command: phase detection, the two phases, the gate, the mistakes to avoid |
 | [`.claude/settings.json`](../../.claude/settings.json) | pre-approved `gh` and `git worktree` calls, so the loop does not stall on prompts |
+| [`.gitignore`](../../.gitignore) | excludes `.claude/worktrees/`, which is what lets the worktrees live inside the checkout |
 | [`.github/ISSUE_TEMPLATE/feature_request.yml`](../../.github/ISSUE_TEMPLATE/feature_request.yml) | the structured input Phase 0 reads |
 | [`.github/pull_request_template.md`](../../.github/pull_request_template.md) | the body Phase 2 composes by hand |
 | [`.claude/skills/creating-branches/SKILL.md`](../../.claude/skills/creating-branches/SKILL.md) | the branch convention both phases obey |
@@ -120,7 +135,9 @@ Four of the files are generic and three carry project-specific content.
   about issues and pull requests.
 
 **Also required in the target:** Spec Kit initialised, the Superpowers plugin
-enabled, the two labels created, and `gh` authenticated. Without Spec Kit the
+enabled, the two labels created, `gh` authenticated, and `.claude/worktrees/`
+added to the target's `.gitignore` — without that line the worktrees show up as
+untracked files in the primary checkout and in every tool that walks it. Without Spec Kit the
 `/speckit-*` steps have nothing to call; without Superpowers the implementation
 loses its test-first and verification gates and becomes ordinary unguarded
 coding.

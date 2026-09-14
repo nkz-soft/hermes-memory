@@ -17,7 +17,7 @@ from wherever the repository says the work stands — there is no state file.
 
 | What exists | Phase to run |
 |---|---|
-| No worktree at `../<repo>-<number>` | Phase 0, then Phase 1 |
+| No worktree at `.claude/worktrees/<number>` | Phase 0, then Phase 1 |
 | Worktree exists, no `plan.md` in its feature directory | Phase 1, resuming |
 | Worktree exists and `plan.md` is committed | Phase 2 — but only with the human's go-ahead |
 
@@ -55,13 +55,20 @@ Then isolate the workspace, per superpowers:using-git-worktrees:
 
 ```bash
 git fetch origin
-git worktree add --detach ../<repo>-<number> origin/main
+git worktree add --detach .claude/worktrees/<number> origin/main
 gh issue edit <number> --add-label in-progress
 ```
 
 `--detach` matters, because the feature branch's name is not known yet: Spec Kit
 derives it in the next phase. Everything from here on runs **inside the
 worktree**, never in the primary checkout.
+
+The worktree sits inside the primary checkout, under a path `.gitignore`
+excludes, so that it is part of the session's working directory and the file
+tools reach it without a permission prompt for every read and write. Being
+ignored, it is invisible to `git status`, to `ruff`, and to any other tool that
+honours `.gitignore`; `pytest` is confined to `testpaths` and never descends
+into it either.
 
 ## Phase 1 — specify and plan, then stop
 
