@@ -78,9 +78,10 @@ grep for contradicting statements.
 Tasks T003–T006 write consecutive paragraphs of the same block and therefore carry no `[P]`.
 
 - [x] T003 [US1] Write decision 1 in `ARCHITECTURE.md` ADR-006 Decision: periodic full re-export
-  imported incrementally; the archive is cumulative rather than a delta; the manual export request
-  is a property of the source recorded as a constraint; acquisition is explicitly outside this
-  decision, a replaceable component whose MVP default is manual placement (FR-002, FR-007)
+  imported incrementally; each export carries the account's history in full rather than a delta; the
+  manual export request is a property of the source recorded as a constraint; acquisition is
+  explicitly outside this decision, a replaceable component whose MVP default is manual placement
+  (FR-002, FR-007)
 - [x] T004 [US1] Write decision 2: a conversation whose content changed is replaced in full;
   `update_mode: "append"` stays reserved for its §9 purpose of delivering one oversized document as
   several items in a single operation (FR-003)
@@ -90,8 +91,8 @@ Tasks T003–T006 write consecutive paragraphs of the same block and therefore c
   `document_id`, out of scope for the MVP and absent from every import path (FR-004, FR-005)
 - [x] T006 [US1] Write decision 4: the §17 content hash covers messages, their order and their
   timestamps, and excludes the title and importer-produced metadata (FR-006)
-- [x] T007 [US1] Write the **Rationale** paragraph from research.md: the cumulative archive making
-  the skip sufficient, idempotency and whole-conversation context outweighing re-extraction cost,
+- [x] T007 [US1] Write the **Rationale** paragraph from research.md: a full export making the skip
+  sufficient, idempotency and whole-conversation context outweighing re-extraction cost,
   the indistinguishability of a truncated export from a deliberate deletion, the asymmetry of risk,
   and the archive's independence under Principle I and ADR-001
 - [x] T008 [US1] Write the **Consequences** paragraph stating the three costs plainly rather than
@@ -146,6 +147,39 @@ that stands alone.
 - [x] T015 Run `uv run ruff check . && uv run ruff format --check . && uv run pytest` as the guard
   rail that nothing in the codebase was disturbed — noting it cannot verify the record itself,
   since no check in this repository inspects Markdown
+
+---
+
+## Phase 7: Review fixes
+
+**Purpose**: What a code review of the first pass found. Recorded as tasks rather than folded back
+into T003–T008, so the record shows what the first attempt got wrong and why the second is better.
+
+- [x] T016 Replace the "each export is a superset of the previous one" claim in
+  `ARCHITECTURE.md` decision 1 and in `research.md`: it was factually wrong and refuted by decision 3
+  in the same record, since a conversation deleted in the source is exactly how a later export holds
+  less. Now "carries the account's history in full rather than the changes since the last one", with
+  deletion named as the one exception and a revisit trigger if the source ever starts issuing deltas
+- [x] T017 State in `ARCHITECTURE.md` Consequences the re-run consequence of decision 4 (FR-011):
+  importer-produced metadata being outside the hash means an ordinary refresh after a parser,
+  sanitizer or extraction-policy change skips everything and does nothing, so the re-application
+  §3.1 and Principle I promise is kept by an explicit forced re-import that ignores the skip. Amend
+  `plan.md`'s Principle I paragraph, which claimed compliance this consequence complicates
+- [x] T018 Resolve the intersection of decision 2 and §9 in `ARCHITECTURE.md` (FR-012): a
+  conversation both oversized and grown is re-sent whole within one retain request, first item
+  replacing and the remainder appending. Also drop the word "operation", which §9 already uses for
+  `operation_id`
+- [x] T019 Small corrections in `ARCHITECTURE.md`: restore "no **supported** interface" so the claim
+  is not falsifiable, and carry the credential-hazard reason that actually blocks the unsupported
+  path; widen the MUST NOT to name the import state as well as the raw archive, since the import
+  state is what a synchronization feature would actually diff; replace "logged as an observation"
+  with "recorded in the run log", because observations are a Hindsight concept in this document;
+  say "the timestamps of the messages" so conversation-level `update_time` cannot creep into the
+  hash and defeat decision 4; and phrase the last-import age as belonging to the command surface
+  rather than asserting a `status` command ahead of #21
+- [x] T020 Record on issue #14 the two criteria this feature cannot test — the missing-conversation
+  survival test and the forced re-import — so the hand-off is a mechanism rather than an assertion
+  made in a spec directory #14's author has no reason to open
 
 ---
 

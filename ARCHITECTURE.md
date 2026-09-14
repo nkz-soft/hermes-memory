@@ -569,34 +569,42 @@ one intended gate.
 export of the source, imported incrementally. Four questions the architecture
 left open are settled together, because they are one policy:
 
-1. **The refresh model.** The ChatGPT archive is cumulative — each export is a
-   superset of the previous one, not a delta — so a refresh is a new export
-   placed under `data/` and a re-run of the import, where the skip by source id
-   and content hash (§17) confines the cost to what is new or changed. The
-   export itself is requested by a person: no interface yields an account's
-   conversation history, and that is recorded here as a property of the source
-   rather than as missing tooling. How the archive arrives is outside this
-   decision — acquisition is a replaceable component whose default
-   implementation is manual placement — so automating it later changes nothing
-   below.
+1. **The refresh model.** Each export carries the account's history in full
+   rather than the changes since the last one, so a refresh is a new export
+   placed under `data/` and a re-run of the import, needing no merge: the skip
+   by source id and content hash (§17) confines the cost to what is new or
+   changed. The only way a later export holds less than an earlier one is a
+   conversation deleted in the source, which decision 3 governs. Should the
+   source ever begin issuing deltas instead, this decision is the one to
+   revisit. The export itself is requested by a person: no supported interface
+   yields an account's conversation history, and driving an unsupported one
+   would mean holding live credentials in a project whose Principle V exists
+   because credentials in this corpus are hazardous. That is a property of the
+   source, recorded here rather than treated as missing tooling. How the archive
+   arrives is outside this decision — acquisition is a replaceable component
+   whose default implementation is manual placement — so automating it later
+   changes nothing below.
 2. **A conversation that continued** is replaced in full. `update_mode:
    "replace"` stays the default for re-import, and `append` remains reserved for
-   its §9 purpose of delivering one oversized document as several items within a
-   single operation.
+   its §9 purpose of delivering one oversized document as several items. Where
+   the two meet — a conversation both too large to send at once and grown since
+   the last import — the whole conversation is re-sent within one retain
+   request, its first item replacing and the remainder appending, which keeps
+   the composition idempotent.
 3. **A conversation that disappeared stays.** The importer MUST NOT diff the raw
-   archive against an export, and MUST NOT derive removals from one. An absence
-   may be logged as an observation; nothing may act on it. Deliberate forgetting
-   is a separate, human-initiated operation on a named `document_id`, reserved
-   for content that must not be retained; it is out of scope for the MVP and
-   belongs to no import path.
+   archive or the import state against an export, and MUST NOT derive removals
+   from one. An absence may be recorded in the run log; nothing may act on it.
+   Deliberate forgetting is a separate, human-initiated operation on a named
+   `document_id`, reserved for content that must not be retained; it is out of
+   scope for the MVP and belongs to no import path.
 4. **The content hash covers content, not presentation.** The canonical
-   representation hashed under §17 includes the messages, their order and their
-   timestamps, and excludes the title and any metadata the importer itself
-   produces.
+   representation hashed under §17 includes the messages, their order and the
+   timestamps of the messages, and excludes the title and any metadata the
+   importer itself produces.
 
-**Rationale.** The cumulative archive makes a skip sufficient: nothing needs
-merging, and the expensive part of an import is extraction per conversation,
-which §17 already avoids for everything unchanged. Replacing a grown
+**Rationale.** A full export makes a skip sufficient: nothing needs merging, and
+the expensive part of an import is extraction per conversation, which §17
+already avoids for everything unchanged. Replacing a grown
 conversation rather than appending to it keeps re-import idempotent — a replay
 from the raw archive, which Principle I requires to stay possible, would
 otherwise append the same tail twice — and keeps extraction seeing the whole
@@ -622,10 +630,18 @@ remains retrievable through memory, by design — and until deliberate forgettin
 exists, rebuilding the bank is the only remedy for a secret the sanitizer
 missed.
 
+A fourth consequence follows from decision 4 and must not be discovered later.
+Because importer-produced metadata is outside the hash, an ordinary refresh
+after the parser, the sanitizer or the extraction policy has changed skips every
+unchanged conversation and therefore does nothing. §3.1 and Principle I promise
+that such a change can be re-applied to the whole archive, so that promise is
+kept by an explicit forced re-import that ignores the skip — a path the import
+state owes, not something an ordinary refresh performs.
+
 The rule binds sources whose export cannot distinguish absence from deletion. A
 source that carries an explicit deletion event is a different case, decided in
 that source's own record (§2).
 
-Memory ages between refreshes and nothing forces one, so the `status` command
-reports the age of the last import: the decay is made visible rather than
-prevented.
+Memory ages between refreshes and nothing forces one, which is why the age of
+the last import belongs in whatever the command surface reports: the decay is
+made visible rather than prevented.

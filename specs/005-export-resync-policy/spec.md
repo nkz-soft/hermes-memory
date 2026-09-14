@@ -110,8 +110,8 @@ behaviour.
 - **FR-001**: ARCHITECTURE.md §23 MUST carry a new record, ADR-006, following the shape the other
   records use — Decision, Rationale, Consequences — and named for the model it fixes.
 - **FR-002**: ADR-006 MUST state that synchronization is a periodic full re-export imported
-  incrementally, that the ChatGPT archive is cumulative rather than a delta, and that the manual
-  export request is a property of the source recorded as a constraint.
+  incrementally, that each export carries the account's history in full rather than a delta, and
+  that the manual export request is a property of the source recorded as a constraint.
 - **FR-003**: ADR-006 MUST state that a conversation whose content changed is replaced in full,
   that `update_mode: "append"` remains reserved for its §9 purpose, and that repeated extraction
   cost is accepted in exchange for idempotent re-import and whole-conversation context.
@@ -134,6 +134,13 @@ behaviour.
   the document-id scheme of §10.
 - **FR-010**: The change MUST be confined to ARCHITECTURE.md §17 and §23 plus this feature's own
   specification artefacts; no source code and no test of unimplemented behaviour is added.
+- **FR-011**: ADR-006 MUST state the consequence that follows from FR-006 for re-runs: because
+  importer-produced metadata is outside the hash, an ordinary refresh after the parser, the
+  sanitizer or the extraction policy changed skips everything and does nothing, so the re-application
+  §3.1 and Principle I promise is kept by an explicit forced re-import that ignores the skip.
+- **FR-012**: ADR-006 MUST resolve the intersection of FR-003 and §9 — a conversation both oversized
+  and grown — rather than leaving an implementer to choose between re-sending it and having no legal
+  path for it.
 
 ### Non-Functional Requirements
 
@@ -158,9 +165,11 @@ behaviour.
 
 ## Assumptions
 
-- **The ChatGPT archive is cumulative.** Each export is a superset of the previous one rather than
-  a delta. This is an observed property of the source, not something the project controls; if it
-  ever stops holding, decision 1 is what must be revisited, and the record says so.
+- **Each export carries the account's history in full**, rather than the changes since the last
+  one. Not a superset of the previous export: a conversation deleted in the source is absent from
+  the next one, which is exactly the case decision 3 governs. This is an observed property of the
+  source, not something the project controls; if it ever stops holding, decision 1 is what must be
+  revisited, and the record says so.
 - **There is no supported programmatic export.** No endpoint yields an account's conversation
   history, so the request step is a human action. Recorded as a constraint of the source; issue #40
   covers automating everything after that step, behind its own boundary.

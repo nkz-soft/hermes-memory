@@ -48,12 +48,19 @@ one-sentence cross-reference in §17.
 
 ### Principle I — Raw Archive Is the Source of Truth
 
-**Complies, and reinforces.** Decision 3 is Principle I applied to a case the principle implies but
-does not spell out: if absence from an export could remove a conversation, the source service would
-retain the power to empty an archive whose entire purpose is independence from it. The record makes
-the implication normative. Nothing here weakens the requirement that ingestion be re-runnable from
-the archive alone — decision 2 exists partly to preserve it, since tail-appending would make a
-replay from the archive duplicate content.
+**Complies, and reinforces — with one consequence that had to be written into the record.** Decision
+3 is Principle I applied to a case the principle implies but does not spell out: if absence from an
+export could remove a conversation, the source service would retain the power to empty an archive
+whose entire purpose is independence from it. The record makes the implication normative. Decision 2
+protects the same principle from the other side, since tail-appending would make a replay from the
+archive duplicate content.
+
+Decision 4 needs more care than "complies". Excluding importer-produced metadata from the hash means
+that after the parser, the sanitizer or the extraction policy changes, an ordinary refresh skips
+every unchanged conversation — so ingestion stays mechanically re-runnable while doing nothing,
+which is not what §3.1 promises when it lists re-running after new redaction rules. The record
+therefore states the forced re-import that ignores the skip as an obligation the import state owes.
+Claiming compliance without that sentence would have been the dodge.
 
 ### Principle II — Provenance and Stable Identity
 

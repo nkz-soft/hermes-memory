@@ -13,8 +13,11 @@ Rationale and Consequences sections are reported rather than improvised.
 under `data/` and a re-run of the import; the skip by source id plus content hash (§17) confines
 the cost to what is new or changed.
 
-**Rationale.** The archive the source produces is cumulative — each export is a superset of the
-previous one, not a delta — so there is no merge to perform and no window to track. The expensive
+**Rationale.** Each export carries the account's history in full rather than the changes since the
+last one, so there is no merge to perform and no window to track. "Full" is not "superset": the one
+way a later export holds less than an earlier one is a conversation deleted in the source, which is
+what decision 3 governs — so the two decisions describe the same input rather than contradicting
+each other. The expensive
 part of an import is not reading the file, it is LLM extraction per conversation, and §17's skip
 already removes that cost for everything unchanged. The refresh therefore needs no new mechanism;
 it needs to be named, so that nobody builds one.
