@@ -102,10 +102,14 @@ Docker Desktop — a difference that would otherwise surface as "passes in CI, f
 | `generic-api-key` | `specs/003-logging-telemetry-baseline/quickstart.md:65` | The same literal, in a documented worked example |
 | `generic-api-key` | `specs/003-logging-telemetry-baseline/quickstart.md:94` | The same literal again |
 
-The count differs between tree and history (5 against 10) because several literals were touched by
-more than one commit, and one moved line. This is worth stating plainly: **exemptions must be
-expressed so that they survive a line moving**, which rules out fingerprint-based exemptions for
-these cases (R5).
+The counts differ with what the scan can reach, and the difference is worth stating plainly rather
+than leaving someone to reconcile two numbers later. A scan of the working tree reports 5, one per
+location. A scan of a full clone's history reports 10, because several of those literals were
+touched by more than one commit and one moved line. A scan of this feature branch's own ancestry —
+which is what CI does on a pull request — reports 5 again. Same five places throughout.
+
+The moved line is the part that constrains the design: **exemptions must survive a line moving**,
+which rules out fingerprint-based exemptions for these cases (R5).
 
 Story 3 is therefore not hypothetical. Without exemptions this feature cannot merge at all, since
 FR-009 forbids merging with an unaddressed finding behind it, and the findings are all in code that

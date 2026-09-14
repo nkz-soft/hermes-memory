@@ -53,6 +53,39 @@ The module tree under `src/hermes_memory/` mirrors the layout recorded in the
 [constitution](.specify/memory/constitution.md); a test parses that record and
 fails if the two disagree in either direction.
 
+## Secret scanning and the container image
+
+Two further checks run in CI and need a container runtime. Without one you can
+still run everything above, and CI remains the backstop for these two.
+
+```bash
+# Scan the whole history for credentials
+docker run --rm -v "$PWD:/repo" -w /repo \
+  -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+  ghcr.io/gitleaks/gitleaks:v8.30.1 git . --no-banner --redact -v
+
+# Build the image and run it
+docker build -t hermes-memory:local . && docker run --rm hermes-memory:local
+```
+
+The scan reads the **history**, not the working tree, because git remembers what
+a diff forgets: a credential committed and deleted in the next commit is still
+reachable. It runs on every pull request, and a finding fails the build.
+
+**If the scan reports a finding, assume the credential is live.** Deleting it
+from the diff does not help — it stays in the history of the branch you pushed.
+Revoke it first, then remove it.
+
+A finding is a false positive only if the value is synthetic and deliberate,
+which in this repository means a fixture proving that secrets get redacted. To
+declare one, add an entry to [`.gitleaks.toml`](.gitleaks.toml) naming the rule,
+the file and the literal — all three, never a directory. A test enforces that
+shape, because widening an exemption is how this check gets quietly disabled.
+
+`tests/fixtures/secret_scanning/` is the opposite: a key that **must** be found.
+CI scans it separately and fails if that scan comes back clean, which is what
+proves the check can fail at all.
+
 ## Configuration
 
 Everything the project reads from its environment is listed in

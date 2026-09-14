@@ -31,15 +31,20 @@ In PowerShell, substitute `${PWD}` for `$PWD` and drop the line continuations.
 Expected, once the exemptions are committed:
 
 ```text
-INF 33 commits scanned.
-INF scanned ~1369809 bytes (1.37 MB) in 2.79s
+INF 12 commits scanned.
+INF scanned ~863298 bytes (863.30 KB) in 1.94s
 INF no leaks found
 ```
 
 Exit status 0. Against the repository **before** this feature's `.gitleaks.toml` exists, the same
-command reports `leaks found: 10` and exits 1 — the ten occurrences of the five deliberate fixtures
-enumerated in [data-model.md](data-model.md). Running it in that order is worth doing once: it is
-the only way to see that the exemptions are load-bearing rather than decorative.
+command exits 1 on the deliberate fixtures enumerated in [data-model.md](data-model.md). Running it
+in that order is worth doing once: it is the only way to see that the exemptions are load-bearing
+rather than decorative.
+
+The count of findings depends on what the scan can reach, which is worth knowing before comparing
+two runs: this branch's ancestry yields **5**, one per location, while a full clone with every
+branch fetched yields **10**, because several of those literals were touched by more than one
+commit. Both are the same five places. CI scans the pull request's own ancestry.
 
 ## The negative control — prove the scan can fail
 
@@ -59,9 +64,9 @@ Expected — a finding, and **exit status 1**:
 Finding:     aws_access_key_id = REDACTED
 Secret:      REDACTED
 RuleID:      aws-access-token
-File:        leaky_config.ini
-Line:        1
-Fingerprint: leaky_config.ini:aws-access-token:1
+File:        tests/fixtures/secret_scanning/leaky_config.ini
+Line:        19
+Fingerprint: tests/fixtures/secret_scanning/leaky_config.ini:aws-access-token:19
 
 WRN leaks found: 1
 ```
