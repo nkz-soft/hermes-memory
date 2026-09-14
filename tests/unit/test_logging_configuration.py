@@ -92,6 +92,47 @@ def test_a_standard_library_record_is_structured_too(
     assert record["level"] == "warning"
 
 
+def test_a_broken_standard_library_record_does_not_leak_its_arguments(
+    rendered: Rendered, complete_environment: dict[str, str]
+) -> None:
+    """The failure path is where leaks happen, so it gets the same guarantee (FR-017).
+
+    Found in review. A stdlib caller with mismatched `%` arguments makes the formatter raise, and
+    `logging.Handler.handleError` then prints the message *and its arguments* straight to standard
+    error — outside the pipeline, unredacted, and not JSON. `httpx.warning("bad %d", token)` is an
+    ordinary mistake to make.
+    Our handler is driven directly rather than through `logging.getLogger("httpx").warning(...)`,
+    because pytest installs a capture handler of its own that re-raises formatting errors — the
+    call would fail inside pytest's handler before reaching ours, and the test would be about
+    pytest.
+    """
+    configure(load_settings(env_file=None))
+
+    secret = "ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
+    handler = next(
+        candidate
+        for candidate in stdlib_logging.getLogger().handlers
+        if candidate.__class__.__name__ == "_StructuredHandler"
+    )
+    record = stdlib_logging.LogRecord(
+        name="httpx",
+        level=stdlib_logging.WARNING,
+        pathname=__file__,
+        lineno=1,
+        msg="connection failed after %d",
+        args=(secret,),
+        exc_info=None,
+    )
+
+    handler.emit(record)
+
+    text = rendered.text()
+
+    assert secret not in text
+    for line in rendered.lines():
+        json.loads(line)  # every line, including the failure report, is still one JSON object
+
+
 def test_the_configured_level_is_applied(
     rendered: Rendered, complete_environment: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

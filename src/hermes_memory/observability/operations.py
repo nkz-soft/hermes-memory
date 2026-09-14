@@ -49,12 +49,24 @@ class Operation:
     decided by an exception rather than claimed.
     """
 
+    __slots__ = ("_status",)
+
     def __init__(self) -> None:
-        self.status = OperationStatus.IMPORTED
+        self._status = OperationStatus.IMPORTED
+
+    @property
+    def status(self) -> OperationStatus:
+        """The outcome so far. Read-only: `skipped()` is the only way to change it.
+
+        A writable attribute would let a caller assign `failed` and produce a record claiming a
+        failure with `error` null — a shape the data model does not allow, describing an exception
+        this manager never saw. Failure is decided by an exception, not claimed.
+        """
+        return self._status
 
     def skipped(self) -> None:
         """Nothing to do — unchanged since a previous run (ARCHITECTURE.md §17)."""
-        self.status = OperationStatus.SKIPPED
+        self._status = OperationStatus.SKIPPED
 
 
 @contextmanager

@@ -175,6 +175,63 @@ def test_a_credential_in_a_sequence_is_withheld(rendered: Rendered) -> None:
     assert A_JWT not in rendered.text()
 
 
+def test_a_credential_in_a_mapping_key_is_withheld(rendered: Rendered) -> None:
+    """A key is as much a value as a value is.
+
+    Found in review, after the first implementation emitted it verbatim. The realistic shapes are
+    an aggregation keyed by endpoint — `{url: count}` — and a header mapping that arrived the other
+    way round. Withholding the value while printing the credential in the key protects nothing.
+    """
+    get_logger().info("retrying", headers={f"Authorization: {A_JWT}": "sent"})
+
+    assert A_JWT not in rendered.text()
+
+
+def test_a_credential_in_a_url_used_as_a_key_is_withheld(rendered: Rendered) -> None:
+    """The same hole, by the route most likely to occur: counting by endpoint."""
+    get_logger().info("attempts per endpoint", entries={SHAPES["url_userinfo"]: 3})
+
+    assert "hunter2ampersand" not in rendered.text()
+
+
+def test_a_credential_in_a_top_level_field_name_is_withheld(rendered: Rendered) -> None:
+    """Top-level names are ordinarily identifiers, but `**payload` accepts anything."""
+    get_logger().info("odd", **{f"header {A_JWT}": "sent"})
+
+    assert A_JWT not in rendered.text()
+
+
+def test_bytes_are_not_emitted_as_a_recoverable_integer_list(rendered: Rendered) -> None:
+    """`bytes` is a `Sequence`, which is how a credential became a list of code points.
+
+    Found in review. The emitted `[103, 104, 112, ...]` is the token — reversible by anyone with
+    `bytes()` — and unreadable as a log line besides. A response body or a header read off a
+    socket arrives as bytes without anyone deciding it should.
+    """
+    secret = SHAPES["github_token"].encode()
+
+    get_logger().info("raw payload", payload=secret)
+
+    text = rendered.text()
+
+    assert SHAPES["github_token"] not in text
+    assert "103, 104" not in text, "bytes were walked as a sequence of code points"
+
+
+def test_bytes_that_hold_nothing_secret_stay_readable(rendered: Rendered) -> None:
+    """The fix must not turn every byte string into an opaque marker."""
+    get_logger().info("raw payload", payload=b"an ordinary response body")
+
+    assert "an ordinary response body" in rendered.one()["payload"]
+
+
+def test_undecodable_bytes_do_not_raise(rendered: Rendered) -> None:
+    """Arbitrary bytes are not UTF-8, and a log call must not fail because of it."""
+    get_logger().info("raw payload", payload=b"\xff\xfe\x00binary")
+
+    assert rendered.one()["event"] == "raw payload"
+
+
 def test_the_standard_library_path_is_redacted_too(
     rendered: Rendered, complete_environment: dict[str, str]
 ) -> None:

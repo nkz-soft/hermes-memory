@@ -71,7 +71,10 @@ These hold for every record, whatever the caller did, and they are the reason th
    error (FR-002).
 2. **No credential.** A value is withheld when its field name matches the name roster below, when
    it is a `SecretStr`, or when the value matches the shape roster below — at any depth up to 6,
-   inside mappings and sequences alike (FR-009, FR-010, FR-011, FR-012).
+   inside mappings and sequences alike (FR-009, FR-010, FR-011, FR-012). **Field names are
+   themselves scanned**: a mapping keyed by endpoint puts a URL's userinfo into a key, and
+   withholding the value beside it would protect nothing. **Byte strings are decoded and scanned**
+   rather than walked as sequences, which would emit a token as a reversible list of code points.
 3. **No conversation content by default.** A `ConversationContent` renders as `[redacted:content]`
    unless the content flag is on, and the flag never affects guarantee 2 (FR-014, FR-015).
 4. **Exceptions are covered.** The rendered traceback and the exception's message and arguments
@@ -188,7 +191,34 @@ observed to fail (Principle III).
 31. A record emitted inside a span carries `trace_id` and `span_id`.
 32. A record emitted outside a span carries neither.
 
+**Found in review, after the first implementation**
+
+35. A credential in a mapping key does not appear — including a URL used as a key, which is how an
+    aggregation by endpoint is shaped.
+36. A credential in a top-level field name does not appear. Names are ordinarily identifiers, but
+    `logger.info(event, **payload)` accepts whatever the payload's keys are.
+37. A `bytes` value carrying a credential does not appear, and is not emitted as a list of code
+    points; a `bytes` value carrying nothing secret stays readable; undecodable bytes do not raise.
+38. A standard-library record whose `%` arguments do not match its format string produces a
+    structured report that withholds the message and the arguments. The default
+    `logging.Handler.handleError` prints both to standard error, outside the pipeline — a typo
+    turned into a leak, on the failure path.
+39. `Operation.status` cannot be assigned; `skipped()` is the only mutator, so no caller can claim
+    a failure the manager never saw.
+
 **Repository invariants**
 
 33. No module outside `observability/` configures logging, adds a handler or writes to stderr.
 34. The runtime dependency guard names exactly the five permitted distributions.
+
+## Known limits
+
+Stated so that the feature relying on one finds it written down rather than discovering it.
+
+* **Operation context does not cross threads.** It is held in context variables, so work handed to
+  a thread pool inside an operation emits records without the §18 identity. The MVP importer is
+  sequential; the feature that parallelises it binds the context inside the worker.
+* **`session` is deliberately not on the name roster.** It looks like an obvious addition, and it
+  is not: Claude Code's own history is keyed by session id, so `session_id` is a conversation's
+  identity in this project — exactly the kind of real field a redactor must not eat.
+* **The shape roster is not a secret scanner**, as stated above and in research.md R7.

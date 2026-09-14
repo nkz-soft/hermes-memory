@@ -234,6 +234,19 @@ def test_failures_survive_a_raised_threshold(
     assert records[0]["status"] == "failed"
 
 
+def test_the_status_cannot_be_set_to_failed_by_hand(rendered: Rendered) -> None:
+    """Found in review: the handle promised one mutator and exposed a writable attribute.
+
+    A caller who assigned `failed` would produce a record claiming a failure with `error: null` —
+    a shape the data model does not allow, describing an exception the manager never saw. Failure
+    is decided by an exception, not claimed.
+    """
+    with ingestion_operation(**AN_OPERATION) as operation, pytest.raises(AttributeError):
+        operation.status = OperationStatus.FAILED  # type: ignore[misc]
+
+    assert rendered.one()["status"] == "imported"
+
+
 def test_the_status_vocabulary_is_closed(rendered: Rendered) -> None:
     """Check 3 — three outcomes and no others, so a typo is a failure and not a value (FR-004)."""
     assert {status.value for status in OperationStatus} == {"imported", "skipped", "failed"}

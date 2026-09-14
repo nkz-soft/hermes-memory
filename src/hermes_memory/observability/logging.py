@@ -18,13 +18,18 @@ The name says what the file is rather than dodging a hazard the language removed
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
 import structlog
 
-from hermes_memory.settings import Settings
+if TYPE_CHECKING:
+    # Imported for the annotation only. `install_default_pipeline()` runs at import of this
+    # package, and its whole purpose is to be safe when settings are not available — including
+    # when `settings` itself is what failed to import (research.md R3).
+    from hermes_memory.settings import Settings
 
 __all__ = [
     "configure",
@@ -84,6 +89,41 @@ class _StructuredHandler(logging.Handler):
         # A logging handler must never raise into the code that logged.
         except Exception:
             self.handleError(record)
+
+    def handleError(self, record: logging.LogRecord) -> None:
+        """Report a formatting failure without printing the record that caused it.
+
+        The default implementation writes a traceback plus the message *and its arguments* to
+        standard error, outside the pipeline and unredacted. The ordinary cause is a caller with
+        mismatched `%` arguments — `logger.warning("failed after %d", token)` — so the default
+        turns a typo into a leak, on the failure path, which is where leaks happen.
+
+        What is emitted instead names the logger and the exception and nothing else: neither
+        `record.msg` nor `record.args` is rendered, because their contents are what could not be
+        formatted and therefore what has not been inspected.
+        """
+        try:
+            _, error, _ = sys.exc_info()
+            stream = _destination()
+            stream.write(
+                json.dumps(
+                    {
+                        "event": "logging.record_could_not_be_formatted",
+                        "level": "error",
+                        "logger": record.name,
+                        "error": type(error).__name__ if error else "unknown",
+                        "note": "the record's message and arguments are withheld: they are what "
+                        "failed to format, and so are the one thing here that was never "
+                        "inspected",
+                    }
+                )
+                + "\n"
+            )
+            stream.flush()
+        except Exception:
+            # Nothing further to do. Raising here would take down the caller for the sake of a
+            # log line about a log line.
+            pass
 
 
 def _shared_processors() -> list[Any]:

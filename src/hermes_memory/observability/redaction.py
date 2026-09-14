@@ -153,7 +153,7 @@ def redacting_processor(*, include_conversation_content: bool) -> Any:
 
     def redact(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         return {
-            key: _redact_value(
+            _safe_key(key): _redact_value(
                 key,
                 value,
                 depth=0,
@@ -163,6 +163,17 @@ def redacting_processor(*, include_conversation_content: bool) -> Any:
         }
 
     return redact
+
+
+def _safe_key(key: Any) -> str:
+    """A field name, with any credential-shaped span in it withheld.
+
+    A key is as much a value as a value is. Field names are ordinarily identifiers, but
+    `logger.info(event, **payload)` accepts whatever the payload's keys are, and a mapping keyed by
+    endpoint — `{url: attempts}` — puts a URL's userinfo straight into a key. Withholding the value
+    while printing the credential beside it protects nothing.
+    """
+    return _redact_shapes(str(key))
 
 
 def _redact_value(
@@ -211,9 +222,12 @@ def _inspect(
     if isinstance(value, bool | int | float) or value is None:
         return value
 
+    if isinstance(value, bytes | bytearray | memoryview):
+        return _redact_bytes(value)
+
     if isinstance(value, Mapping):
         return {
-            str(inner_key): _redact_value(
+            _safe_key(inner_key): _redact_value(
                 str(inner_key),
                 inner_value,
                 depth=depth + 1,
@@ -250,6 +264,19 @@ def _is_sensitive_name(key: str) -> bool:
         return True
 
     return any(pair in SENSITIVE_PAIRS for pair in pairwise(segments))
+
+
+def _redact_bytes(value: bytes | bytearray | memoryview) -> str:
+    """Bytes, decoded and shape-scanned rather than walked as a sequence of integers.
+
+    `bytes` is a `Sequence`, so without this branch a token becomes `[103, 104, 112, ...]` — which
+    is the token, reversible by anyone with `bytes()`, and unreadable as a log line besides. A
+    response body or a header read off a socket arrives as bytes without anyone deciding it should.
+
+    Decoded with `errors="replace"` because arbitrary bytes are not UTF-8 and a log call must not
+    fail because of it.
+    """
+    return _redact_shapes(bytes(value).decode("utf-8", errors="replace"))
 
 
 def _redact_shapes(value: str) -> str:
