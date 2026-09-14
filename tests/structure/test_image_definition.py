@@ -62,12 +62,21 @@ def test_the_runtime_interpreter_matches_the_repository_pin() -> None:
     ships. The pin is read from `.python-version`, the same file a contributor's uv reads.
     """
     pin = PYTHON_VERSION_FILE.read_text(encoding="utf-8").strip()
-    runtime_base = _arguments("FROM")[-1]
+    bases = _arguments("FROM")
 
-    assert pin in runtime_base, (
-        f"The runtime stage is built on {runtime_base!r}, which does not carry the interpreter "
-        f"pinned in .python-version ({pin}). The image would ship a different runtime than the "
-        "one every check ran on."
+    assert bases, "The Dockerfile declares no FROM instruction."
+
+    # Every stage naming a Python version, not only the last. A builder pinned to a different minor
+    # version produces a virtual environment whose interpreter does not exist in the runtime stage:
+    # C7 would catch it, but only after a build that should never have been attempted.
+    versioned = [base for base in bases if re.search(r"python:?3\.\d+", base)]
+    assert versioned, f"No stage names a Python version: {bases}."
+
+    mismatched = [base for base in versioned if pin not in base]
+    assert not mismatched, (
+        f"These stages are built on {mismatched}, which do not carry the interpreter pinned in "
+        f".python-version ({pin}). The image would ship a different runtime than the one every "
+        "check ran on."
     )
 
 

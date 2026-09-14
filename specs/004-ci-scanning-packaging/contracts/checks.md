@@ -48,7 +48,19 @@ planning (research R4, R5, R7), make this concrete here:
    exemption one character too broad and a green tick over it.
 
 So the feature commits a fixture that **must** be found, at `tests/fixtures/secret_scanning/`, and
-CI scans that directory on its own and requires a non-zero exit.
+CI scans that directory on its own and requires a finding.
+
+**What this proves, exactly.** The scanner and this invocation of it can produce a failure. It does
+**not** prove the exemptions are narrow — the control scans a path where the configuration is not
+read, so an exemption widened to the whole tree would leave it passing unchanged. Exemption breadth
+is guarded separately, by checks S6, S7 and S8 over the committed configuration. The two guards
+cover different things and neither substitutes for the other.
+
+**Requiring a finding, not merely a failure.** The scanner exits 1 both when it finds a leak and
+when it fails fatally — a renamed fixture, a mistyped flag, an image that would not pull. Treating
+any non-zero status as success would let a scan that never ran stand in for one that worked, which
+is this feature's own threat model one level up. The control therefore sets `--exit-code 42` and
+requires exactly that status: 42 is returned only for a finding.
 
 This works because of a measured property of the scanner's configuration resolution: the
 configuration is read from the *scanned path*, so a scan of the repository root applies
@@ -82,7 +94,7 @@ than an assertion about it.
 | S6 | Every `[[allowlists]]` entry sets `condition = "AND"`. The default is OR, under which `paths` alone exempts a whole file for that rule |
 | S7 | Every `[[allowlists]]` entry declares a non-empty `targetRules`, a non-empty `paths` and a non-empty `regexes`. All three conditions must be present for FR-008's narrowness to mean anything |
 | S8 | Every `paths` pattern is anchored (`^`…`$`) and ends in a file extension — no entry may name a directory, which is the blanket exemption FR-008 forbids |
-| S9 | The workflow runs the negative control against `tests/fixtures/secret_scanning/` and requires a non-zero exit |
+| S9 | The workflow runs the negative control against `tests/fixtures/secret_scanning/` and requires the exit status that means *a finding*, not merely a non-zero one |
 | S10 | The workflow still references no repository secret and still declares `permissions: contents: read` — the existing fork-safety assertion, re-run with the new jobs present |
 
 ### Image definition and workflow

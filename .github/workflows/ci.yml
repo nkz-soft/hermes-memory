@@ -78,17 +78,31 @@ jobs:
 
       - name: Prove the scan can fail
         # The negative control. tests/fixtures/secret_scanning/ carries a synthetic key that must be
-        # detected; this step inverts the scanner's status, so the job fails when that scan comes
-        # back clean. Without it, an exemption one character too broad would be invisible behind a
-        # green tick. The directory is scanned directly, so /.gitleaks.toml is not consulted and the
-        # fixture's own exemption does not apply.
+        # detected, and this step fails the job unless it is. It proves that the scanner and this
+        # invocation of it can produce a failure at all — a check never observed failing is not
+        # known to work. It says nothing about whether the exemptions are too broad; that is
+        # guarded separately, by the shape assertions in
+        # tests/structure/test_secret_scanning_config.py.
+        #
+        # The directory is scanned directly, where /.gitleaks.toml is not consulted, so the
+        # fixture's own exemption cannot mask it.
+        #
+        # --exit-code 42 is what makes this honest. The scanner exits 1 both when it finds a leak
+        # and when it fails fatally — a renamed fixture, a mistyped flag, an image that would not
+        # pull — so "non-zero" would let a scan that never ran stand in for a scan that worked. 42
+        # is returned only for a finding.
         run: |
-          if docker run --rm \
-               -v "$PWD:/repo" -w /repo \
-               ghcr.io/gitleaks/gitleaks:v8.30.1 dir tests/fixtures/secret_scanning \
-               --no-banner --redact -v; then
-            echo "::error::The negative control was not detected. The secret scan is not working,"
-            echo "::error::whatever the previous step reported. See specs/004-ci-scanning-packaging."
+          set +e
+          docker run --rm \
+            -v "$PWD:/repo" -w /repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 dir tests/fixtures/secret_scanning \
+            --no-banner --redact -v --exit-code 42
+          status=$?
+          set -e
+          if [ "$status" -ne 42 ]; then
+            echo "::error::The negative control reported no finding (exit $status). Either the scan"
+            echo "::error::is not working or it did not run at all, whatever the previous step"
+            echo "::error::reported. See specs/004-ci-scanning-packaging."
             exit 1
           fi
 
@@ -104,12 +118,20 @@ jobs:
         run: docker build -t hermes-memory:ci .
 
       - name: Run the image (C7)
-        # Asserted on the output, not the exit status. An entry point that exits 0 having printed
-        # nothing would satisfy a status check while failing the thing this check exists for.
+        # Both halves are asserted, and separately. The container must exit 0 *and* print usage:
+        # an entry point that exits 0 having printed nothing would satisfy a status check while
+        # failing the thing this check exists for, and one that prints usage and then exits 2
+        # would satisfy an output check while breaking FR-014.
+        #
+        # They are two statements rather than a pipeline on purpose. A `run:` block's default shell
+        # is `bash -e` without pipefail, so in `docker run | grep -q` only grep's status would
+        # reach the step and a non-zero container exit would pass unnoticed.
         #
         # No arguments are passed: `--help` is the image's default argument, so this is exactly the
         # acceptance criterion of issue #7 — an image whose entry point runs the CLI's --help.
-        run: docker run --rm hermes-memory:ci | tee /tmp/usage.txt | grep -q "Usage:"
+        run: |
+          docker run --rm hermes-memory:ci > usage.txt
+          grep -q "Usage:" usage.txt
 
       - name: Confirm what the image does not carry
         # The image must not ship the development dependencies, the tests, or anything from the
@@ -117,6 +139,7 @@ jobs:
         run: |
           docker run --rm --entrypoint sh hermes-memory:ci -c '
             test ! -d /app/tests || { echo "tests/ shipped in the image"; exit 1; }
+            test ! -e /app/data || { echo "data/ shipped in the image"; exit 1; }
             if python -c "import pytest" 2>/dev/null; then
               echo "pytest shipped in the image"; exit 1
             fi

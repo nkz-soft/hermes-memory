@@ -50,9 +50,10 @@ unless told otherwise, and a history scan over a one-commit checkout passes vacu
 single most likely way for this feature to ship broken while appearing to work, which is why the
 workflow test asserts on it (contracts/checks.md, check S4).
 
-**Measured.** `gitleaks git` over this repository's history scans 33 commits and ~1.37 MB in 2.79 s
-— about two orders of magnitude inside SC-005's two-minute budget. The dominant cost of the step is
-the image pull, not the scan.
+**Measured.** `gitleaks git` over a full clone's history — 33 commits across every ref — scans
+~1.37 MB in 2.79 s. Over this feature branch's own ancestry, which is what CI scans on a pull
+request, it is 14 commits and ~891 KB in 2.07 s. Either way about two orders of magnitude inside
+SC-005's two-minute budget, and the dominant cost of the step is the image pull, not the scan.
 
 **Alternatives considered.**
 
@@ -83,7 +84,7 @@ silent false pass, the failure mode this feature least tolerates.
 tolerable on a throwaway CI runner and not on a contributor's machine — and FR-010 requires the same
 command in both places.
 
-**Measured.** With the trio set, the history scan reads all 33 commits (R2). Without it the scan is
+**Measured.** With the trio set, the history scan reads every commit it was given (R2). Without it the scan is
 at the mercy of the host's uid mapping, which differs between the Linux runner and a contributor's
 Docker Desktop — a difference that would otherwise surface as "passes in CI, fails for me".
 

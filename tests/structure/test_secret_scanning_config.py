@@ -23,9 +23,43 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG = REPO_ROOT / ".gitleaks.toml"
 
-# A path pattern must name a file. Anchoring alone is not enough: `^tests/unit/.*$` is anchored and
-# exempts a directory. Requiring an extension at the end is the cheap, checkable form of "a file".
-_FILE_SUFFIX = (".py", ".md", ".toml", ".ini", ".yml", ".yaml", ".txt", ".json", ".env", ".cfg")
+_METACHARACTERS = ".*+?[]{}()|^$"
+
+
+def _literal(pattern: str) -> str:
+    """A regex reduced to the literal text it matches, or "" if it is not a literal.
+
+    Anchors are stripped and backslash escapes are unwound, so `^a/b\\.py$` becomes `a/b.py`. A
+    metacharacter appearing *unescaped* means the pattern matches more than one string, and ""
+    is returned. The distinction matters: an escaped dot is an ordinary character, and unwinding
+    the escapes before looking for metacharacters would reject every path in the file.
+
+    This is what lets the assertions below resolve a pattern against the actual tree. An earlier
+    version checked that a path ended in a file extension, and a code review showed what that
+    admits: `^tests/unit/.*\\.py$` is anchored, ends in `.py`, and exempts every Python file in
+    the directory — the blanket FR-008 exists to forbid.
+    """
+    text = pattern.removeprefix("^").removesuffix("$")
+    literal: list[str] = []
+    index = 0
+
+    while index < len(text):
+        character = text[index]
+
+        if character == "\\":
+            if index + 1 >= len(text):
+                return ""
+            literal.append(text[index + 1])
+            index += 2
+            continue
+
+        if character in _METACHARACTERS:
+            return ""
+
+        literal.append(character)
+        index += 1
+
+    return "".join(literal)
 
 
 def _config() -> dict[str, Any]:
@@ -92,35 +126,79 @@ def test_every_exemption_narrows_rule_path_and_value() -> None:
     offenders: list[str] = []
 
     for entry in _allowlists():
+        description = entry.get("description", "<no description>")
+
         missing = [key for key in required if not entry.get(key)]
         if missing:
-            offenders.append(f"{entry.get('description', '<no description>')}: missing {missing}")
+            offenders.append(f"{description}: missing {missing}")
+            continue
+
+        if len(entry["targetRules"]) != 1:
+            offenders.append(f"{description}: targets {entry['targetRules']}, expected one rule")
 
     assert not offenders, (
         "These exemptions do not narrow by rule, path and value with a stated reason: "
         f"{offenders}. "
-        "An exemption missing one of them is broader than it looks."
+        "An exemption missing one of them, or covering several rules, is broader than it looks."
     )
 
 
-def test_no_exemption_names_a_directory() -> None:
-    """Every `paths` pattern is anchored and names a file (check S8, FR-008).
+def test_every_exemption_names_a_file_that_exists() -> None:
+    """Every `paths` pattern resolves to one real file (check S8, FR-008).
 
-    A directory exemption is the blanket FR-008 forbids. `tests/` in particular is the last place
-    to stop scanning: the corpus this project handles makes fixtures a high-risk location, not a
-    safe one.
+    A directory exemption is the blanket FR-008 forbids, and `tests/` in particular is the last
+    place to stop scanning: the corpus this project handles makes fixtures a high-risk location,
+    not a safe one.
+
+    Resolving against the tree, rather than checking the pattern looks file-shaped, is what closes
+    the gap a code review found: `^tests/unit/.*\\.py$` is anchored and ends in an extension while
+    exempting a whole directory. A pattern containing `.*` cannot name a file that exists, so this
+    rejects it — and an exemption left behind by a deleted file fails here too, instead of
+    lingering as breadth nobody is watching.
     """
     offenders: list[str] = []
 
     for entry in _allowlists():
         description = entry.get("description", "<no description>")
         for pattern in entry.get("paths", []):
-            anchored = pattern.startswith("^") and pattern.endswith("$")
-            names_a_file = pattern.rstrip("$").endswith(_FILE_SUFFIX)
-            if not (anchored and names_a_file):
+            literal = _literal(pattern)
+            if not literal or not (REPO_ROOT / literal).is_file():
                 offenders.append(f"{description}: {pattern!r}")
 
     assert not offenders, (
-        f"These path patterns are not anchored to a single file: {offenders}. A pattern that can "
-        "match a directory exempts everything under it for the targeted rules."
+        f"These path patterns do not name a single existing file: {offenders}. A pattern that can "
+        "match more than one path exempts everything it matches for the targeted rule; one that "
+        "matches nothing is a stale exemption."
+    )
+
+
+def test_every_exemption_quotes_a_value_that_is_really_there() -> None:
+    """Every `regexes` entry is a literal that occurs in the file it exempts (check S7, FR-008).
+
+    This is the narrowness guarantee with teeth. Requiring the value to be a literal rejects
+    `.*` and every other pattern that would exempt a file wholesale for its rule, and requiring it
+    to be present means an exemption cannot outlive the fixture it was written for — which is how
+    exemption sets rot into permission to leak.
+    """
+    offenders: list[str] = []
+
+    for entry in _allowlists():
+        description = entry.get("description", "<no description>")
+        texts = [
+            (REPO_ROOT / _literal(pattern)).read_text(encoding="utf-8")
+            for pattern in entry.get("paths", [])
+            if _literal(pattern) and (REPO_ROOT / _literal(pattern)).is_file()
+        ]
+
+        for pattern in entry.get("regexes", []):
+            literal = _literal(pattern)
+            if not literal:
+                offenders.append(f"{description}: {pattern!r} is a pattern, not a literal value")
+            elif not any(literal in text for text in texts):
+                offenders.append(f"{description}: {pattern!r} appears in none of its paths")
+
+    assert not offenders, (
+        f"These exemptions do not quote a literal present in the file they exempt: {offenders}. "
+        "A pattern exempts more than the value it was written for; a literal that is no longer "
+        "there exempts nothing and should be deleted."
     )

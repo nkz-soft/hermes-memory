@@ -327,9 +327,10 @@ def test_the_image_is_run_and_its_output_asserted() -> None:
     scripts = _image_scripts()
 
     assert "docker run" in scripts, "The `image` job builds the image but never runs it."
-    assert "grep" in scripts or "Usage" in scripts, (
-        "The `image` job does not assert on the container's output. Exit status alone is "
-        "satisfied by an entry point that prints nothing at all."
+    assert "Usage:" in scripts, (
+        "The `image` job does not match the application's usage text. Exit status alone is "
+        "satisfied by an entry point that prints nothing at all, and a `grep` for some other "
+        "string would satisfy a looser assertion than this one."
     )
 
 

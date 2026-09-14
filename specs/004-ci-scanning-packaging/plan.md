@@ -27,9 +27,11 @@ in exactly the files most likely to receive a real credential by accident.
 
 Third, **there is a negative control, and it is committed** (contract, R7). This feature's failure
 mode is a green tick over a check that cannot fail. So a fixture that must be found is committed,
-CI scans it directly, and CI requires that scan to fail. Planning already produced one false pass
-here — a fake AWS key that no rule matched — which is the evidence that this is not a theoretical
-concern.
+CI scans it directly, and CI requires that scan to report *a finding* — not merely to exit non-zero,
+which a scanner that failed to run also does. Planning already produced one false pass here — a fake
+AWS key that no rule matched — and code review found a second, where a renamed fixture would have
+satisfied the control. Both are the same mistake at different depths, which is the evidence that
+this is not a theoretical concern.
 
 Fourth, **the image's default argument is `--help`** (R10). `ENTRYPOINT` plus `CMD ["--help"]`
 satisfies both halves of the entry-point requirement at once and takes the exit status out of the
@@ -60,8 +62,9 @@ locally by one documented command each.
 **Target Platform**: `ubuntu-latest` in CI; developer machines with a container runtime for C5–C7.
 The image is built for the build's architecture only (spec assumption).
 
-**Performance Goals**: SC-005 allows the scanning step two minutes. **Measured**: 33 commits,
-1.37 MB, 2.79 s (R2). The step's real cost is the image pull.
+**Performance Goals**: SC-005 allows the scanning step two minutes. **Measured**: 2.07 s over this
+branch's ancestry, 2.79 s over a full clone's 33 commits (R2). The step's real cost is the image
+pull.
 
 **Constraints**: no repository secret and no elevated token, so every new job runs on a pull request
 from a fork (FR-005, FR-017, check S10). Nothing is pushed to a registry. No new runtime dependency

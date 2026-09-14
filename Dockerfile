@@ -7,9 +7,10 @@
 # would end this workflow's ability to run on a pull request from a fork.
 
 # --- builder -----------------------------------------------------------------------------------
-# The interpreter is the one pinned in .python-version, which is the pin every check runs under. A
-# test asserts the runtime stage below still agrees with that file: an image built on a different
-# interpreter than the tests ran on proves nothing about what ships.
+# The interpreter comes from the base image's tag, not from .python-version — that file is not in
+# the build context. What keeps the two in step is a test: every stage naming a Python version is
+# asserted to carry the pin .python-version holds. An image built on a different interpreter than
+# the checks ran under proves nothing about what ships.
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
 ENV UV_COMPILE_BYTECODE=1 \
