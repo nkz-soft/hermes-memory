@@ -199,7 +199,7 @@ same body, observe it present.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T021 [P] [US3] Write `tests/unit/test_conversation_content.py` covering checks 19–24: with no
+- [X] T021 [P] [US3] Write `tests/unit/test_conversation_content.py` covering checks 19–24: with no
   configuration at all a `ConversationContent` does not appear; with the flag off, the same; with
   the flag on it appears; with the flag on a credential in the same record is still withheld;
   content beyond the cap is truncated and marked with `…[truncated]`; `ConversationContent`'s own
@@ -207,11 +207,11 @@ same body, observe it present.
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] Add `ConversationContent` to `src/hermes_memory/observability/redaction.py`: a
+- [X] T022 [US3] Add `ConversationContent` to `src/hermes_memory/observability/redaction.py`: a
   frozen wrapper rendering as `[redacted:content]` unless the flag is on, with `__repr__` and
   `__str__` withholding the text (research.md R8), and a documented truncation cap applied when the
   flag is on.
-- [ ] T023 [US3] Have `configure()` pass `settings.logging.include_conversation_content` into the
+- [X] T023 [US3] Have `configure()` pass `settings.logging.include_conversation_content` into the
   processor, defaulting to off when `configure()` has not run, and export `ConversationContent`
   from `__init__.py`. Observe T021 pass.
 
