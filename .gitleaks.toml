@@ -64,3 +64,16 @@ regexTarget = "line"
 targetRules = ["generic-api-key"]
 paths = ['''^specs/003-logging-telemetry-baseline/quickstart\.md$''']
 regexes = ['''hs-live-9f3c2a7e51b04d6f''']
+
+# 004: the negative control. This one is different in kind from the four above — it exists to be
+# found. Exempting it here keeps the repository scan green; CI scans that directory *directly*,
+# where this configuration is not consulted, and fails the build if the key is not detected. The
+# exemption is therefore not a way of ignoring the key: it is what lets the key stay in the tree so
+# that the check can be proven able to fail.
+[[allowlists]]
+description = "004: the negative-control fixture, which CI scans separately and requires to fail"
+condition = "AND"
+regexTarget = "line"
+targetRules = ["aws-access-token"]
+paths = ['''^tests/fixtures/secret_scanning/leaky_config\.ini$''']
+regexes = ['''AKIAQ7B4TYZ3KJ6MNP5R''']

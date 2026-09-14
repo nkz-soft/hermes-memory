@@ -6,9 +6,10 @@ on:
   push:
     branches: [main]
 
-# The four checks only read the repository. Say so, rather than inheriting the default token
+# The checks only read the repository. Say so, rather than inheriting the default token
 # scope — and note that nothing here reads a secret, which is what lets this workflow run
-# unchanged on a pull request from a fork.
+# unchanged on a pull request from a fork. The scanning and image jobs were added under that same
+# constraint: no secret, no registry login, nothing pushed.
 permissions:
   contents: read
 
@@ -48,3 +49,45 @@ jobs:
 
       - name: Tests
         run: uv run pytest
+
+  scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Not the default, and load-bearing. actions/checkout fetches a single commit unless
+          # told otherwise, and a history scan over one commit passes without looking at anything.
+          fetch-depth: 0
+
+      - name: Scan the history (C5)
+        # The scanner is pinned to an exact version: a floating tag would make this job's verdict a
+        # function of an upstream release rather than of the change under test.
+        #
+        # `-v` so a finding names its file, line and rule; `--redact` so the matched value is never
+        # printed into a build log that is public on a public repository.
+        #
+        # The GIT_CONFIG_* trio exempts the bind-mounted repository from git's ownership check.
+        # Without it git refuses to read a repository owned by another uid, and the scanner reports
+        # zero findings on a repository it never opened — a silent false pass.
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" -w /repo \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 git . --no-banner --redact -v
+
+      - name: Prove the scan can fail
+        # The negative control. tests/fixtures/secret_scanning/ carries a synthetic key that must be
+        # detected; this step inverts the scanner's status, so the job fails when that scan comes
+        # back clean. Without it, an exemption one character too broad would be invisible behind a
+        # green tick. The directory is scanned directly, so /.gitleaks.toml is not consulted and the
+        # fixture's own exemption does not apply.
+        run: |
+          if docker run --rm \
+               -v "$PWD:/repo" -w /repo \
+               ghcr.io/gitleaks/gitleaks:v8.30.1 dir tests/fixtures/secret_scanning \
+               --no-banner --redact -v; then
+            echo "::error::The negative control was not detected. The secret scan is not working,"
+            echo "::error::whatever the previous step reported. See specs/004-ci-scanning-packaging."
+            exit 1
+          fi
