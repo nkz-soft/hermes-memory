@@ -47,21 +47,54 @@ def _triggers(document: dict[str, Any]) -> dict[str, Any]:
     return triggers
 
 
-def _run_commands(document: dict[str, Any]) -> list[str]:
+def _run_commands(document: dict[str, Any], job_name: str | None = None) -> list[str]:
     """Every `run:` script in the workflow — the commands GitHub will actually execute.
 
     Comments and step names are excluded by construction, which is the point: only a real
     command satisfies the assertions below.
+
+    With ``job_name``, only that job's scripts are returned. Asserting against the whole workflow
+    would let a command in any job satisfy a claim about a specific one — and the scanning and
+    image jobs each have properties the other must not be able to vouch for.
     """
     commands: list[str] = []
+    jobs = document.get("jobs", {})
 
-    for job in document.get("jobs", {}).values():
+    if job_name is not None:
+        jobs = {job_name: _job(document, job_name)}
+
+    for job in jobs.values():
         for step in job.get("steps", []):
             script = step.get("run")
             if script:
                 commands.append(script)
 
     return commands
+
+
+def _job(document: dict[str, Any], name: str) -> dict[str, Any]:
+    """One named job. Fails with the jobs that do exist, which is the useful message."""
+    jobs = document.get("jobs", {})
+    assert name in jobs, f"The workflow declares no job named {name!r}. It has: {sorted(jobs)}."
+
+    job = jobs[name]
+    assert isinstance(job, dict), f"Job {name!r} did not parse to a mapping."
+    return job
+
+
+def _step_using(document: dict[str, Any], job_name: str, action: str) -> dict[str, Any]:
+    """The first step of a job whose `uses:` names ``action``, with its parsed inputs.
+
+    Addressing the step rather than the file is what makes an assertion about `with:` mean
+    something: a `fetch-depth: 0` anywhere in the file would otherwise satisfy a claim about the
+    scanning job's checkout specifically.
+    """
+    for step in _job(document, job_name).get("steps", []):
+        uses = step.get("uses", "")
+        if uses.startswith(action):
+            return step
+
+    raise AssertionError(f"Job {job_name!r} has no step using {action!r}.")
 
 
 def test_runs_on_pull_requests_to_main() -> None:
