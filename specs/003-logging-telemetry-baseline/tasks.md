@@ -114,25 +114,25 @@ and assert all ten fields are present with the intended values.
 
 > Write these first; observe them fail.
 
-- [ ] T012 [P] [US1] Write `tests/unit/test_operation_record.py` covering checks 1–5: one record
+- [X] T012 [P] [US1] Write `tests/unit/test_operation_record.py` covering checks 1–5: one record
   per operation carrying **all ten** fields of data-model.md — `event` (fixed
   `"ingestion.operation"`), `source`, `source_id`, `project` (nullable), `bank`, `document_id`
   (nullable), `start_time` (ISO 8601, UTC, with offset), `duration_ms` (numeric, never accepted
   from the caller), `status`, `error` (null unless failed); `status` is `imported` on a clean exit,
   `skipped` when the body says so, `failed` on an exception; on an exception the record is emitted,
   `error` is non-null **and the exception reaches the caller**.
-- [ ] T013 [P] [US1] Add checks 6–7 to the same file: context bound for an operation appears on
+- [X] T013 [P] [US1] Add checks 6–7 to the same file: context bound for an operation appears on
   other records emitted inside it and on none emitted after it ends; two operations in sequence on
   one thread do not share context.
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Create `src/hermes_memory/observability/operations.py`: `OperationStatus` as a
+- [X] T014 [US1] Create `src/hermes_memory/observability/operations.py`: `OperationStatus` as a
   closed enumeration of exactly `imported`, `skipped`, `failed`; the `ingestion_operation`
   context manager binding the §18 context through `structlog.contextvars`, timing the body with a
   monotonic clock for `duration_ms` and `datetime.now(UTC)` for `start_time`, emitting one terminal
   record, re-raising every exception unchanged, and unbinding the context on every exit path.
-- [ ] T015 [US1] Export `ingestion_operation` and `OperationStatus` from
+- [X] T015 [US1] Export `ingestion_operation` and `OperationStatus` from
   `src/hermes_memory/observability/__init__.py`. Observe T012 and T013 pass.
 
 **Checkpoint**: §18's record exists and is honest about failure. Credentials are **not** yet

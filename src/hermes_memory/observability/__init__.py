@@ -13,7 +13,18 @@ the console with nothing withheld.
 """
 
 from hermes_memory.observability.logging import configure, get_logger, install_default_pipeline
+from hermes_memory.observability.operations import (
+    Operation,
+    OperationStatus,
+    ingestion_operation,
+)
 
-__all__ = ["configure", "get_logger"]
+__all__ = [
+    "Operation",
+    "OperationStatus",
+    "configure",
+    "get_logger",
+    "ingestion_operation",
+]
 
 install_default_pipeline()
