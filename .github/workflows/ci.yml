@@ -91,3 +91,34 @@ jobs:
             echo "::error::whatever the previous step reported. See specs/004-ci-scanning-packaging."
             exit 1
           fi
+
+  image:
+    name: Container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the image (C6)
+        # Nothing is pushed and no registry is logged into: publishing needs credentials, and a job
+        # that needs a secret stops running on pull requests from forks.
+        run: docker build -t hermes-memory:ci .
+
+      - name: Run the image (C7)
+        # Asserted on the output, not the exit status. An entry point that exits 0 having printed
+        # nothing would satisfy a status check while failing the thing this check exists for.
+        #
+        # No arguments are passed: `--help` is the image's default argument, so this is exactly the
+        # acceptance criterion of issue #7 — an image whose entry point runs the CLI's --help.
+        run: docker run --rm hermes-memory:ci | tee /tmp/usage.txt | grep -q "Usage:"
+
+      - name: Confirm what the image does not carry
+        # The image must not ship the development dependencies, the tests, or anything from the
+        # ignored data directory, and must not run as root.
+        run: |
+          docker run --rm --entrypoint sh hermes-memory:ci -c '
+            test ! -d /app/tests || { echo "tests/ shipped in the image"; exit 1; }
+            if python -c "import pytest" 2>/dev/null; then
+              echo "pytest shipped in the image"; exit 1
+            fi
+            test "$(id -u)" -ne 0 || { echo "the container runs as root"; exit 1; }
+          '

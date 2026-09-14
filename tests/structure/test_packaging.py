@@ -92,6 +92,7 @@ EXPECTED_RUNTIME_DEPENDENCIES = frozenset(
         "structlog",
         "opentelemetry-api",
         "opentelemetry-sdk",
+        "typer",
     }
 )
 """Every runtime dependency the project is allowed to declare, by distribution name.
@@ -109,6 +110,9 @@ that needed it, and with the row of the constitution's Technology Stack table th
   the SDK for the process that configures a provider, not two competing choices
   (specs/003-logging-telemetry-baseline/research.md R11). No exporter distribution is declared:
   nothing is exported yet, and the feature that exports chooses its exporter then.
+* `typer` — the CLI row, added by 004-ci-scanning-packaging. The container image's entry point must
+  be an installed application, so the entry point had to exist; it is a shell with no command, and
+  `tests/unit/test_cli.py` keeps it that way (specs/004-ci-scanning-packaging/research.md R11).
 """
 
 
@@ -127,4 +131,23 @@ def test_runtime_dependencies_are_exactly_the_declared_set() -> None:
         f"{sorted(EXPECTED_RUNTIME_DEPENDENCIES)}. Adding or removing one is a deliberate change "
         "— update this test in the same commit, and say in the pull request which decision "
         "record permits it."
+    )
+
+
+def test_the_command_line_entry_point_is_installed() -> None:
+    """The project installs a console script (check P1, FR-021).
+
+    The container image's entry point is this script. Were it absent, the image would have to
+    reach into a source tree the runtime stage does not carry — and the packaging target would go
+    on being assumed rather than exercised, which is what 004 exists to stop.
+    """
+    scripts = _pyproject()["project"].get("scripts", {})
+
+    assert "hermes-memory" in scripts, (
+        f"No console script named `hermes-memory` is declared; found {sorted(scripts)}. The "
+        "container image's entry point is the installed script, not a path into src/."
+    )
+    assert scripts["hermes-memory"].startswith("hermes_memory.cli"), (
+        f"The console script points at {scripts['hermes-memory']!r}, which is not in "
+        "`hermes_memory.cli`. The command-line surface lives in the cli boundary."
     )

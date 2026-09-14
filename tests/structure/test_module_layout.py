@@ -212,11 +212,14 @@ def _holds_only_a_docstring(source: Path) -> bool:
     return len(body) <= 1 and bool(not body or ast.get_docstring(ast.Module(body, [])))
 
 
-FILLED_BOUNDARIES = frozenset({"observability"})
+FILLED_BOUNDARIES = frozenset({"observability", "cli"})
 """The recorded boundaries a feature has filled with an implementation, and when.
 
 * ``observability`` — 003-logging-telemetry-baseline. The structured logging pipeline and the
   tracer provider live there because that is the boundary ARCHITECTURE.md §8 gives them.
+* ``cli`` — 004-ci-scanning-packaging, and barely. The container image's entry point must be an
+  installed application, so the Typer application had to exist; it carries no command, and
+  ``tests/unit/test_cli.py`` asserts that it still carries none.
 
 Every other recorded module is still held to holding nothing but a docstring, and filling one is an
 edit to this set inside the feature's own commit — which is the point. A guard that exempted any

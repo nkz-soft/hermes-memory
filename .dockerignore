@@ -1,0 +1,31 @@
+# Everything not excluded here is sent to the build daemon and can end up in the image.
+#
+# `data/` is the entry that matters beyond image size: conversation exports and archives live
+# there, it is untracked, and it must never reach a built artifact (constitution, Principles I
+# and V). The rest is weight and noise.
+#
+# tests/structure/test_image_definition.py asserts that .git, tests, specs and data stay listed.
+
+.git
+.github
+.gitignore
+.gitattributes
+
+data
+tests
+specs
+docs
+.specify
+.claude
+
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+Dockerfile
+.dockerignore
+.gitleaks.toml

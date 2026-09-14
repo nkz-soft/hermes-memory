@@ -11,7 +11,14 @@ dependencies = [
     "pydantic>=2",
     "pydantic-settings>=2",
     "structlog>=26.1.0",
+    "typer>=0.12",
 ]
+
+[project.scripts]
+# The container image's entry point. It is the installed console script rather than a path into
+# src/, so that the image exercises the packaged application — see
+# specs/004-ci-scanning-packaging/research.md R11.
+hermes-memory = "hermes_memory.cli:main"
 
 # Each dependency arrives with the feature that needs it — the stack table fixes which tool is
 # used when one is needed, not that all of them are pinned on day one.
@@ -24,6 +31,10 @@ dependencies = [
 # opentelemetry-api, -sdk      the Telemetry row: the API for callers, the SDK for the process
 #                              that configures a provider. No exporter is declared — nothing is
 #                              exported yet (specs/003-logging-telemetry-baseline/research.md R11).
+# typer                        the CLI row, added by 004-ci-scanning-packaging. The entry point it
+#                              provides is a shell with no command: the container image's entry
+#                              point has to be an installed application, and commands arrive with
+#                              the features that specify them.
 # tests/structure/test_packaging.py holds this line.
 
 [dependency-groups]

@@ -148,6 +148,8 @@ def test_runs_every_check_in_the_contract() -> None:
         "C3 format": ("checks", "ruff format --check"),
         "C4 tests": ("checks", "pytest"),
         "C5 secret scan": ("scan", HISTORY_SCAN),
+        "C6 image build": ("image", "docker build"),
+        "C7 image smoke test": ("image", "docker run"),
     }
 
     missing = [
@@ -295,4 +297,52 @@ def test_the_scan_is_proven_able_to_fail() -> None:
     assert any("exit 1" in script for script in controls), (
         "The negative control does not fail the job when the scan finds nothing. It must invert "
         "the scanner's status: a clean result there means the check has stopped working."
+    )
+
+
+# --- The image (004-ci-scanning-packaging, checks I7-I9) ---------------------------------------
+
+REGISTRY_WRITES = ("docker push", "docker login", "docker/login-action")
+
+
+def _image_scripts() -> str:
+    """Every `run:` script in the image job, joined."""
+    return " \n".join(_run_commands(_workflow(), "image"))
+
+
+def test_the_image_is_built() -> None:
+    """The image is built on every run, as a command (check I7, FR-015)."""
+    assert "docker build" in _image_scripts(), (
+        "No `run:` step in the `image` job builds the image. An unexercised packaging target is "
+        "discovered broken at the moment someone first needs it."
+    )
+
+
+def test_the_image_is_run_and_its_output_asserted() -> None:
+    """The built image is run and its **output** checked (check I8, FR-016).
+
+    An entry point that exits 0 having printed nothing satisfies a status check while failing the
+    thing this check exists for. So the job must match the usage text, not merely succeed.
+    """
+    scripts = _image_scripts()
+
+    assert "docker run" in scripts, "The `image` job builds the image but never runs it."
+    assert "grep" in scripts or "Usage" in scripts, (
+        "The `image` job does not assert on the container's output. Exit status alone is "
+        "satisfied by an entry point that prints nothing at all."
+    )
+
+
+def test_the_image_is_never_published() -> None:
+    """Nothing is pushed and no registry is logged into (check I9, FR-017).
+
+    Publishing needs registry credentials, and a job that needs a secret stops running on pull
+    requests from forks — which is the property the whole workflow is built around.
+    """
+    job_text = str(_job(_workflow(), "image"))
+    offenders = [write for write in REGISTRY_WRITES if write in job_text]
+
+    assert not offenders, (
+        f"The image job contains {offenders}. Publishing requires credentials, which would end "
+        "this workflow's ability to run on a pull request from a fork."
     )
