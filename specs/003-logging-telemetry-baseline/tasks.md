@@ -49,19 +49,19 @@ below emits through what this phase builds.
 
 **⚠️ CRITICAL**: no user story work begins until this phase is complete.
 
-- [ ] T003 [P] Write `tests/unit/test_settings_logging.py`: `HERMES_LOGGING__LEVEL` defaults to
+- [X] T003 [P] Write `tests/unit/test_settings_logging.py`: `HERMES_LOGGING__LEVEL` defaults to
   `"INFO"`; it accepts each of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` case-insensitively;
   any other value fails at load naming the variable and withholding the value (check 28);
   `HERMES_LOGGING__INCLUDE_CONVERSATION_CONTENT` defaults to `False` and parses `true`/`false`; an
   absent `HERMES_LOGGING__*` environment is valid because every field has a default. Observe it
   fail.
-- [ ] T004 Add the `LoggingSettings` group to `src/hermes_memory/settings.py` per data-model.md:
+- [X] T004 Add the `LoggingSettings` group to `src/hermes_memory/settings.py` per data-model.md:
   a `_Frozen` subclass with `level` (closed set of the five standard names, default `INFO`,
   matched case-insensitively) and `include_conversation_content` (bool, default `False`), attached
   to `Settings` as `logging: LoggingSettings` with `default_factory=LoggingSettings` so an absent
   group is valid. Do **not** add it to `_always_descend_into_the_groups` — research.md R12 says
   why. Observe T003 pass.
-- [ ] T005 Add `HERMES_LOGGING__LEVEL` and `HERMES_LOGGING__INCLUDE_CONVERSATION_CONTENT` to
+- [X] T005 Add `HERMES_LOGGING__LEVEL` and `HERMES_LOGGING__INCLUDE_CONVERSATION_CONTENT` to
   `.env.example`, commented out with their defaults and, for the flag, a line stating that setting
   it puts conversation text in the log. 002's existing
   `tests/unit/test_settings_example.py` goes red at T004 and green here (check 29).
