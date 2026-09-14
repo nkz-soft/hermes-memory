@@ -127,8 +127,15 @@ def _emit(
     The context fields are passed explicitly as well as being bound. Binding alone would be enough
     today, but it would make the completeness of §18's field set depend on a processor staying in
     the chain; passed explicitly, the record carries them because this function says so.
+
+    A failure is recorded at error level so that it survives a raised threshold. An operator who
+    quietens a long import must still be told which conversations failed — that is the half of
+    §18's report they cannot reconstruct afterwards.
     """
-    get_logger().info(
+    logger = get_logger()
+    emit = logger.error if status is OperationStatus.FAILED else logger.info
+
+    emit(
         EVENT,
         **context,
         start_time=start_time.isoformat(),

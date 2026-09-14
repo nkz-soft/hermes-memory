@@ -34,6 +34,9 @@ Notes that are requirements rather than commentary:
   (FR-016).
 * Every other field a caller binds to the operation appears alongside these, and these are never
   removed to make room.
+* A `failed` record is emitted at error level; the other two at info. An operator who raises the
+  threshold to quieten a long import must still be told which conversations failed — that is the
+  half of §18's report they cannot reconstruct afterwards.
 
 ### States
 

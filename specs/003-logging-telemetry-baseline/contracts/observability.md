@@ -144,6 +144,8 @@ observed to fail (Principle III).
 6. Context bound for an operation appears on other records emitted inside it, and on none emitted
    after it ends.
 7. Two operations in sequence on one thread do not share context.
+7a. A failed operation is recorded at error level and survives a raised threshold; the other two
+    outcomes are recorded at info.
 
 **Redaction**
 

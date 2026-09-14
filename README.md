@@ -75,6 +75,27 @@ for a single run.
 A missing or malformed setting fails at startup, naming every variable at fault,
 rather than partway through an import.
 
+## Logging
+
+Records are JSON, one object per line, on standard error. Each ingestion
+operation produces exactly one record carrying its source, source id, project,
+bank, document id, start time, duration, status and error.
+
+**Credentials are never logged.** Tokens, keys and authorization headers are
+withheld by the logging pipeline itself — by field name, by secret type, and by
+the shape of the value — so it is not something a caller has to remember. A
+withheld value is replaced by `[redacted]` rather than dropped, so a reader can
+tell redaction from absence.
+
+**Conversation contents are not logged by default.** Set
+`HERMES_LOGGING__INCLUDE_CONVERSATION_CONTENT=true` for a single debugging run
+when you need to see the conversation a parser choked on. It puts private text
+wherever your log goes, so leave it out of `.env`. It never reveals a
+credential: those stay redacted whatever it is set to.
+
+`HERMES_LOGGING__LEVEL` sets how much is emitted (`DEBUG` through `CRITICAL`,
+default `INFO`). Both variables are described in [`.env.example`](.env.example).
+
 ## Documentation
 
 [ARCHITECTURE.md](ARCHITECTURE.md) — scope, boundaries, memory bank strategy,

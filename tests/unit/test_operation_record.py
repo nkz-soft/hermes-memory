@@ -15,7 +15,13 @@ from datetime import datetime
 
 import pytest
 
-from hermes_memory.observability import OperationStatus, get_logger, ingestion_operation
+from hermes_memory.observability import (
+    OperationStatus,
+    configure,
+    get_logger,
+    ingestion_operation,
+)
+from hermes_memory.settings import load_settings
 
 from .conftest import Rendered
 
@@ -185,6 +191,47 @@ def test_two_operations_in_sequence_do_not_share_context(rendered: Rendered) -> 
 
     assert first["source_id"] == "first"
     assert second["source_id"] == "second"
+
+
+def test_a_successful_operation_is_recorded_at_info_level(rendered: Rendered) -> None:
+    """The ordinary outcome is ordinary news."""
+    with ingestion_operation(**AN_OPERATION):
+        pass
+
+    assert rendered.one()["level"] == "info"
+
+
+def test_a_failed_operation_is_recorded_at_error_level(rendered: Rendered) -> None:
+    """A failure reported at info level is a failure nobody raised the volume for."""
+    with pytest.raises(RuntimeError), ingestion_operation(**AN_OPERATION):
+        raise RuntimeError("the export was truncated")
+
+    assert rendered.one()["level"] == "error"
+
+
+def test_failures_survive_a_raised_threshold(
+    rendered: Rendered, complete_environment: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reason the level matters at all (ARCHITECTURE.md §18).
+
+    An operator who raises the level to quieten a long import must still be told which
+    conversations failed — that is the half of §18's report they cannot reconstruct afterwards.
+    """
+    monkeypatch.setenv("HERMES_LOGGING__LEVEL", "WARNING")
+    configure(load_settings(env_file=None))
+
+    with ingestion_operation(source="chatgpt", source_id="fine", bank="engineering-global"):
+        pass
+    with (
+        pytest.raises(RuntimeError),
+        ingestion_operation(source="chatgpt", source_id="broken", bank="engineering-global"),
+    ):
+        raise RuntimeError("the export was truncated")
+
+    records = rendered.records()
+
+    assert [record["source_id"] for record in records] == ["broken"]
+    assert records[0]["status"] == "failed"
 
 
 def test_the_status_vocabulary_is_closed(rendered: Rendered) -> None:

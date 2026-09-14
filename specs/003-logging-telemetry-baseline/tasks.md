@@ -251,14 +251,14 @@ identifiers tying it to that span.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T027 [P] Write `tests/structure/test_logging_surface.py` (check 33): parse the committed
+- [X] T027 [P] Write `tests/structure/test_logging_surface.py` (check 33): parse the committed
   sources and assert that no module outside `src/hermes_memory/observability/` calls
   `logging.basicConfig`, adds a handler, calls `structlog.configure`, or writes to `sys.stdout` or
   `sys.stderr` — asked of the parsed tree rather than by grepping, as
   `tests/structure/test_environment_files.py` does for the environment.
-- [ ] T028 [P] Add a short Logging section to `README.md`: the two variables, what the flag does and
+- [X] T028 [P] Add a short Logging section to `README.md`: the two variables, what the flag does and
   what it does not do, and that records are JSON on standard error.
-- [ ] T029 Run every step of [quickstart.md](quickstart.md) by hand and confirm each expected
+- [X] T029 Run every step of [quickstart.md](quickstart.md) by hand and confirm each expected
   outcome, including step 4's `author` field surviving and step 5's token staying redacted with the
   flag on.
 - [ ] T030 Run `uv run pytest`, `uv run ruff check .` and `uv run ruff format --check .`; quote the
