@@ -228,19 +228,19 @@ identifiers tying it to that span.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T024 [P] [US4] Write `tests/unit/test_tracing.py` covering checks 30–32: a span can be
+- [X] T024 [P] [US4] Write `tests/unit/test_tracing.py` covering checks 30–32: a span can be
   started and ended and no network call is made; a record emitted inside a span carries `trace_id`
   and `span_id`; a record emitted outside a span carries neither.
 
 ### Implementation for User Story 4
 
-- [ ] T025 [US4] Create `src/hermes_memory/observability/tracing.py`: a `TracerProvider` built with
+- [X] T025 [US4] Create `src/hermes_memory/observability/tracing.py`: a `TracerProvider` built with
   an explicit `Resource` of `service.name = "hermes-memory"` and `service.version` from the
   installed distribution, with **no** span processor and **no** exporter (research.md R11), set
   once per process behind a module-level flag; plus `get_tracer(name)` and the correlation
   processor adding `trace_id` and `span_id` as lowercase hexadecimal only when the current span
   context is valid.
-- [ ] T026 [US4] Wire the correlation processor into its slot in
+- [X] T026 [US4] Wire the correlation processor into its slot in
   `src/hermes_memory/observability/logging.py` — before redaction, so the ids pass through it like
   any other field — construct the provider in `configure()`, and export `get_tracer` from
   `__init__.py`. Observe T024 pass.

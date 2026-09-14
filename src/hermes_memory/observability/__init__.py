@@ -19,6 +19,7 @@ from hermes_memory.observability.operations import (
     ingestion_operation,
 )
 from hermes_memory.observability.redaction import REDACTED, ConversationContent
+from hermes_memory.observability.tracing import get_tracer
 
 __all__ = [
     "REDACTED",
@@ -27,6 +28,7 @@ __all__ = [
     "OperationStatus",
     "configure",
     "get_logger",
+    "get_tracer",
     "ingestion_operation",
 ]
 

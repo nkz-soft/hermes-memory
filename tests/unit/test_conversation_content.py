@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from hermes_memory.observability import ConversationContent, REDACTED, configure, get_logger
+from hermes_memory.observability import REDACTED, ConversationContent, configure, get_logger
 from hermes_memory.observability.redaction import CONTENT_CAP, CONTENT_REDACTED, TRUNCATED_SUFFIX
 from hermes_memory.settings import load_settings
 
@@ -25,9 +25,7 @@ A_TOKEN = "ghp_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
 
 
 @pytest.fixture
-def content_enabled(
-    complete_environment: dict[str, str], monkeypatch: pytest.MonkeyPatch
-) -> None:
+def content_enabled(complete_environment: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
     """Configure the process the way an operator chasing a parser defect would."""
     monkeypatch.setenv("HERMES_LOGGING__INCLUDE_CONVERSATION_CONTENT", "true")
     configure(load_settings(env_file=None))
