@@ -6,6 +6,13 @@ values, the shape roster, nesting, depth, exceptions, fail-closed behaviour and 
 Every credential below is a literal invented here. Nothing in this suite needs a real one, and CI
 runs on fork pull requests, so a repository secret must never be what makes it pass.
 
+A fixture must exercise a roster entry's *shape* without impersonating a particular vendor's live
+key. An earlier draft used a `sk_live_…` bearer token and GitHub's push protection refused the
+branch, correctly: a test fixture that a scanner cannot distinguish from a real Stripe key is one
+that trips scanners for everyone, forever. The bearer fixture is now obviously synthetic. The
+prefixed-key fixtures keep their vendor prefixes because the roster matches on exactly those, and
+their bodies are plainly not keys.
+
 The shape roster is the last line of defence for a log line — not a secret scanner.
 ARCHITECTURE.md §13's sanitizer is what protects conversation content on its way to the memory
 engine, and nothing here may be mistaken for it (research.md R7).
