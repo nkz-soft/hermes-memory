@@ -6,15 +6,24 @@ readme = "README.md"
 license = "MIT"
 requires-python = "==3.13.*"
 dependencies = [
+    "opentelemetry-api>=1.44.0",
+    "opentelemetry-sdk>=1.44.0",
     "pydantic>=2",
     "pydantic-settings>=2",
+    "structlog>=26.1.0",
 ]
 
 # Each dependency arrives with the feature that needs it — the stack table fixes which tool is
-# used when one is needed, not that all of them are pinned on day one. These two are the Pydantic
-# v2 entry the constitution already fixes; `pydantic-settings` is the part of it carrying
-# BaseSettings, separated at the v1→v2 split for packaging reasons, and it displaces nothing
-# (specs/002-environment-configuration/research.md R2).
+# used when one is needed, not that all of them are pinned on day one.
+#
+# pydantic, pydantic-settings  the Models and contracts row. `pydantic-settings` is the part of
+#                              Pydantic v2 carrying BaseSettings, separated at the v1→v2 split for
+#                              packaging reasons, and it displaces nothing
+#                              (specs/002-environment-configuration/research.md R2).
+# structlog                    the Logging row.
+# opentelemetry-api, -sdk      the Telemetry row: the API for callers, the SDK for the process
+#                              that configures a provider. No exporter is declared — nothing is
+#                              exported yet (specs/003-logging-telemetry-baseline/research.md R11).
 # tests/structure/test_packaging.py holds this line.
 
 [dependency-groups]

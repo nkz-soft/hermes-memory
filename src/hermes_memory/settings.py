@@ -23,6 +23,7 @@ from pydantic import (
     AnyHttpUrl,
     BaseModel,
     ConfigDict,
+    Field,
     SecretStr,
     StringConstraints,
     ValidationError,
@@ -35,8 +36,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 __all__ = [
     "ENV_NESTED_DELIMITER",
     "ENV_PREFIX",
+    "LOG_LEVELS",
     "HindsightSettings",
     "LlmSettings",
+    "LoggingSettings",
     "Settings",
     "SettingsError",
     "environment_variable_names",
@@ -114,6 +117,52 @@ class LlmSettings(_Frozen):
         return _blank_is_unset(value)
 
 
+LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+"""The closed set of levels, in increasing severity. The standard library's names, because the
+logging pipeline hands them to the standard library and a private vocabulary would have to be
+translated at the boundary anyway."""
+
+
+class LoggingSettings(_Frozen):
+    """How much the process says, and whether it may say what a conversation contained.
+
+    Both fields carry defaults, so an absent `HERMES_LOGGING__*` environment is valid — the group
+    itself is defaulted on `Settings` for the same reason. That matters more than it looks: the
+    safe behaviour has to be what an operator gets by doing nothing, because doing nothing is what
+    an operator who has never read `.env.example` does
+    (specs/003-logging-telemetry-baseline/research.md R12).
+    """
+
+    level: NonEmptyString = "INFO"
+    include_conversation_content: bool = False
+    """Permits conversation bodies in log records. Off by default, and it never permits a
+    credential: redaction of credentials does not consult it (FR-015)."""
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _normalise_level(cls, value: Any) -> Any:
+        """`debug` is what a person types. Rejecting it would be pedantry rather than validation."""
+        if isinstance(value, str):
+            return value.strip().upper()
+        return value
+
+    @field_validator("level")
+    @classmethod
+    def _reject_an_unknown_level(cls, value: str) -> str:
+        """A typo stops the run, rather than quietly becoming `INFO`.
+
+        Validated here rather than at `configure()` time so that it fails with every other
+        configuration fault, at startup, before any work has been paid for.
+        """
+        if value not in LOG_LEVELS:
+            raise PydanticCustomError(
+                "unknown_log_level",
+                "must be one of {levels}",
+                {"levels": ", ".join(LOG_LEVELS)},
+            )
+        return value
+
+
 class Settings(BaseSettings):
     """Every value this project reads from its environment, validated as a whole.
 
@@ -132,6 +181,9 @@ class Settings(BaseSettings):
 
     hindsight: HindsightSettings
     llm: LlmSettings
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    """Deliberately absent from `_always_descend_into_the_groups` below: every field of this group
+    has a default, so an absent group is a valid group and there is no missing leaf to name."""
     archive_root: Path = Path("data/archive")
     import_state_path: Path = Path("data/import-state.db")
 

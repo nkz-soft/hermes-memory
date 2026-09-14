@@ -85,14 +85,30 @@ def test_package_is_importable_from_src_layout() -> None:
     )
 
 
-EXPECTED_RUNTIME_DEPENDENCIES = frozenset({"pydantic", "pydantic-settings"})
+EXPECTED_RUNTIME_DEPENDENCIES = frozenset(
+    {
+        "pydantic",
+        "pydantic-settings",
+        "structlog",
+        "opentelemetry-api",
+        "opentelemetry-sdk",
+    }
+)
 """Every runtime dependency the project is allowed to declare, by distribution name.
 
-The skeleton declared none, and this test asserted that. 002-environment-configuration is the
-feature that added the first two, under the sentence the previous version of this docstring wrote
-for exactly that purpose. Both are the Pydantic v2 entry the constitution's Technology Stack table
-already fixes — `pydantic-settings` is the part of it carrying `BaseSettings`, separated at the
-v1→v2 split for packaging reasons (specs/002-environment-configuration/research.md R2).
+The skeleton declared none, and this test asserted that. Each entry below arrived with the feature
+that needed it, and with the row of the constitution's Technology Stack table that permits it:
+
+* `pydantic` and `pydantic-settings` — the Models and contracts row, added by
+  002-environment-configuration. `pydantic-settings` is the part of Pydantic v2 carrying
+  `BaseSettings`, separated at the v1→v2 split for packaging reasons
+  (specs/002-environment-configuration/research.md R2).
+* `structlog` — the Logging row, added by 003-logging-telemetry-baseline.
+* `opentelemetry-api` and `opentelemetry-sdk` — the Telemetry row, added by the same feature.
+  These are the two distributions OpenTelemetry-for-Python is packaged as, the API for callers and
+  the SDK for the process that configures a provider, not two competing choices
+  (specs/003-logging-telemetry-baseline/research.md R11). No exporter distribution is declared:
+  nothing is exported yet, and the feature that exports chooses its exporter then.
 """
 
 
