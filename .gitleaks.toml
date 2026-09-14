@@ -1,0 +1,79 @@
+# Secret scanning configuration.
+#
+# The repository is public and the corpus it processes is private engineering history, where a
+# leaked token is a live credential (constitution, Principle V). The scanner runs over the full
+# history on every pull request; `specs/004-ci-scanning-packaging/contracts/checks.md` holds the
+# contract and `quickstart.md` the exact invocation.
+#
+# Every entry below exempts a value this repository carries *on purpose*: the redaction tests of
+# 003-logging-telemetry-baseline assert that credential-shaped values never reach a log line, which
+# requires having them in the tree.
+#
+# The shape of an exemption is enforced by tests/structure/test_secret_scanning_config.py:
+#
+#   condition = "AND"   all three narrowings must hold, not any one of them. This is NOT the
+#                       default — allowlist conditions default to OR, under which `paths` alone
+#                       would stop the scanner reporting anything in that file for those rules.
+#   targetRules         one rule, never all of them.
+#   paths               one file, anchored. Never a directory: the redaction tests are where a real
+#                       credential is most likely to be pasted by someone reproducing a bug, so
+#                       they are the last place to stop looking.
+#   regexes             the specific literal, not a family of them.
+#   regexTarget = "line"
+#                       the literal is matched against the source line, not against the scanner's
+#                       captured secret. Rules capture a fixed length — the GitHub rule takes 36
+#                       characters — so a longer fixture is reported truncated, and an exemption
+#                       matching the secret would have to quote a cut-off string that no longer
+#                       resembles anything in the file. Quoting the line keeps every literal below
+#                       readable against the source it exempts, which is what makes it reviewable.
+#
+# Widening any of these is how this check gets disabled. Adding an entry is a reviewable act; make
+# it one, and say in `description` why the value is safe.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "003: the synthetic GitHub PAT the redaction canary asserts is never logged"
+condition = "AND"
+regexTarget = "line"
+targetRules = ["github-pat"]
+paths = ['''^tests/unit/test_redaction_canary\.py$''']
+regexes = ['''ghp_CanaryAbCdEfGhIjKlMnOpQrStUvWx0123456789''']
+
+[[allowlists]]
+description = "003: the synthetic JWT in the credential-shape roster's test"
+condition = "AND"
+regexTarget = "line"
+targetRules = ["jwt"]
+paths = ['''^tests/unit/test_redaction_values\.py$''']
+regexes = ['''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NSJ9\.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk''']
+
+[[allowlists]]
+description = "003: the project's invented token shape, in the sensitive-name roster's test"
+condition = "AND"
+regexTarget = "line"
+targetRules = ["generic-api-key"]
+paths = ['''^tests/unit/test_redaction_names\.py$''']
+regexes = ['''hs-live-9f3c2a7e51b04d6f''']
+
+[[allowlists]]
+description = "003: the same invented token shape, in that feature's worked example"
+condition = "AND"
+regexTarget = "line"
+targetRules = ["generic-api-key"]
+paths = ['''^specs/003-logging-telemetry-baseline/quickstart\.md$''']
+regexes = ['''hs-live-9f3c2a7e51b04d6f''']
+
+# 004: the negative control. This one is different in kind from the four above — it exists to be
+# found. Exempting it here keeps the repository scan green; CI scans that directory *directly*,
+# where this configuration is not consulted, and fails the build if the key is not detected. The
+# exemption is therefore not a way of ignoring the key: it is what lets the key stay in the tree so
+# that the check can be proven able to fail.
+[[allowlists]]
+description = "004: the negative-control fixture, which CI scans separately and requires to fail"
+condition = "AND"
+regexTarget = "line"
+targetRules = ["aws-access-token"]
+paths = ['''^tests/fixtures/secret_scanning/leaky_config\.ini$''']
+regexes = ['''AKIAQ7B4TYZ3KJ6MNP5R''']
