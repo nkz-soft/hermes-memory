@@ -18,8 +18,11 @@ from hermes_memory.observability.operations import (
     OperationStatus,
     ingestion_operation,
 )
+from hermes_memory.observability.redaction import REDACTED, ConversationContent
 
 __all__ = [
+    "REDACTED",
+    "ConversationContent",
     "Operation",
     "OperationStatus",
     "configure",

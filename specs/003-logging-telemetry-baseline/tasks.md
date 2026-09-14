@@ -153,13 +153,13 @@ output, and assert the literal appears nowhere in it.
 > Write these first; observe them fail. These are the tests that would pass vacuously if written
 > against `capture_logs` — they assert over rendered output only.
 
-- [ ] T016 [P] [US2] Write `tests/unit/test_redaction_names.py` covering checks 8–10:
+- [X] T016 [P] [US2] Write `tests/unit/test_redaction_names.py` covering checks 8–10:
   parametrised over **each** of the twelve name segments (`token`, `secret`, `password`, `passwd`,
   `credential`, `credentials`, `authorization`, `cookie`, `cookies`, `jwt`, `bearer`, `apikey`) and
   **each** of the six pairs (`api`+`key`, `access`+`key`, `private`+`key`, `secret`+`key`,
   `auth`+`header`, `auth`+`token`), the value never appears; and `author`, `idempotency_key`,
   `document_id` and `bank` are **not** redacted.
-- [ ] T017 [P] [US2] Write `tests/unit/test_redaction_values.py` covering checks 11–18: a
+- [X] T017 [P] [US2] Write `tests/unit/test_redaction_values.py` covering checks 11–18: a
   `SecretStr` is withheld whatever the field name; **each** of the four shapes on the shape roster
   is redacted span-wise with the surrounding text surviving; a credential nested mapping-in-list-in-
   mapping does not appear; a value at depth 7 is withheld rather than emitted unexamined; a
@@ -169,16 +169,16 @@ output, and assert the literal appears nowhere in it.
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Create `src/hermes_memory/observability/redaction.py`: the two rosters exactly as
+- [X] T018 [US2] Create `src/hermes_memory/observability/redaction.py`: the two rosters exactly as
   contracts/observability.md lists them, `REDACTED = "[redacted]"`, name matching by lowercasing
   and splitting on runs of non-alphanumeric characters and testing segments and adjacent pairs —
   never substrings (research.md R6) — and shape matching by compiled patterns replacing only the
   matched span.
-- [ ] T019 [US2] Add the walker to the same module: mappings and sequences to a maximum depth of 6,
+- [X] T019 [US2] Add the walker to the same module: mappings and sequences to a maximum depth of 6,
   the value replaced by the marker at the limit; anything not a mapping, sequence, string, number,
   boolean or `None` rendered with `repr()` and then shape-scanned; every per-value step inside a
   guard so that an exception withholds that value and the record is still emitted (research.md R9).
-- [ ] T020 [US2] Wire the processor into the redaction slot of
+- [X] T020 [US2] Wire the processor into the redaction slot of
   `src/hermes_memory/observability/logging.py` — immediately before `JSONRenderer` and after
   `format_exc_info`, which is the ordering the guarantee depends on (research.md R2) — including in
   the import-time default configuration and in the `foreign_pre_chain` for standard-library
