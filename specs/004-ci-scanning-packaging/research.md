@@ -163,6 +163,26 @@ become a finding. Were it otherwise, every exemption would need an exemption.
 
 ---
 
+## R5a — An exemption matches the line, not the captured secret
+
+**Measured during implementation, after the first configuration left one finding standing.** An
+exemption quoting the canary token's full literal did not exempt it. The reason is that a rule
+captures a *fixed length*: the GitHub rule takes 36 characters, and the canary fixture is 40, so the
+reported secret is the fixture truncated — a string that appears nowhere in the source file.
+Matching against the secret would therefore require quoting the cut-off form, which no reviewer
+could compare against the file it exempts.
+
+**Decision.** Every entry sets `regexTarget = "line"`, so the literal quoted in the configuration is
+the literal that appears in the source. This trades a sliver of breadth — any secret on that line,
+of that rule, in that file — for exemptions a human can actually verify by reading. Given that
+`targetRules` and `paths` still both apply, the sliver is not where the risk is; unreviewable
+exemptions are.
+
+**Measured after the change**: the branch's history scans clean — 10 commits, `no leaks found`,
+exit 0.
+
+---
+
 ## R6 — Reporting: `-v --redact`, and why both
 
 **Decision.** Run with `-v` (verbose) and `--redact`.
