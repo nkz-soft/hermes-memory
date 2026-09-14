@@ -65,32 +65,32 @@ below emits through what this phase builds.
   `.env.example`, commented out with their defaults and, for the flag, a line stating that setting
   it puts conversation text in the log. 002's existing
   `tests/unit/test_settings_example.py` goes red at T004 and green here (check 29).
-- [ ] T006 Add a `rendered_records` fixture to `tests/unit/conftest.py`: configures the pipeline to
+- [X] T006 Add a `rendered_records` fixture to `tests/unit/conftest.py`: configures the pipeline to
   write to an in-memory stream, yields a callable returning the parsed JSON lines, and restores the
   previous configuration afterwards. Its docstring **must** state that
   `structlog.testing.capture_logs` is forbidden in this suite because it bypasses the processors
   and would make every redaction test pass vacuously (research.md R13).
-- [ ] T007 [P] Write `tests/unit/test_logging_configuration.py` for the pipeline's own behaviour:
+- [X] T007 [P] Write `tests/unit/test_logging_configuration.py` for the pipeline's own behaviour:
   a record parses as one JSON object per line (check 2); a record emitted with no `configure()`
   call at all is still structured (check 26); `configure()` twice then one log emits exactly one
   line (check 25); `configure()` performs no network call and creates no file (check 27). Observe
   it fail.
-- [ ] T008 Create `src/hermes_memory/observability/logging.py`: the processor chain of research.md
+- [X] T008 Create `src/hermes_memory/observability/logging.py`: the processor chain of research.md
   R2 in the fixed order — `merge_contextvars`, `add_log_level`, `TimeStamper(fmt="iso", utc=True)`,
   `StackInfoRenderer`, `format_exc_info`, then the correlation and redaction slots, then
   `JSONRenderer` — writing to standard error, with `get_logger(name=None)` and a `configure`
   applying the level. Leave the correlation and redaction slots as no-op placeholders; US2 and US4
   fill them.
-- [ ] T009 Rewrite `src/hermes_memory/observability/__init__.py` as the public surface of
+- [X] T009 Rewrite `src/hermes_memory/observability/__init__.py` as the public surface of
   contracts/observability.md, installing the default pipeline at import time (research.md R3) with
   a call that reads no environment, opens no file and makes no network connection.
-- [ ] T010 Run `uv run pytest tests/structure/test_module_layout.py` and **observe
+- [X] T010 Run `uv run pytest tests/structure/test_module_layout.py` and **observe
   `test_recorded_modules_carry_no_behaviour` fail** on the new files — then narrow it per research
   R14: add an explicit set of boundaries that have been filled, `{"observability"}`, excluded from
   the docstring-only assertion, with a docstring saying which feature filled it and that the other
   fourteen are still guarded. Leave `test_the_behaviour_guard_still_bites` untouched: its fixture
   is built from `archive/`, so it keeps proving the narrowed guard bites.
-- [ ] T011 Complete `configure(settings)` in `src/hermes_memory/observability/logging.py`: install
+- [X] T011 Complete `configure(settings)` in `src/hermes_memory/observability/logging.py`: install
   the standard-library bridge through `structlog.stdlib.ProcessorFormatter` with a
   `foreign_pre_chain` sharing the chain (research.md R5), on a single handler tagged with an
   attribute so a previous one is removed rather than stacked (research.md R4), and set

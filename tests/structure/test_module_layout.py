@@ -212,8 +212,20 @@ def _holds_only_a_docstring(source: Path) -> bool:
     return len(body) <= 1 and bool(not body or ast.get_docstring(ast.Module(body, [])))
 
 
+FILLED_BOUNDARIES = frozenset({"observability"})
+"""The recorded boundaries a feature has filled with an implementation, and when.
+
+* ``observability`` — 003-logging-telemetry-baseline. The structured logging pipeline and the
+  tracer provider live there because that is the boundary ARCHITECTURE.md §8 gives them.
+
+Every other recorded module is still held to holding nothing but a docstring, and filling one is an
+edit to this set inside the feature's own commit — which is the point. A guard that exempted any
+module that happened to contain code would be a guard deleting itself.
+"""
+
+
 def _recorded_module_sources() -> list[Path]:
-    """Every ``.py`` file inside a module the constitution records.
+    """Every ``.py`` file inside a recorded module that no feature has filled yet.
 
     Every file in those directories is inspected, not only ``__init__.py``: the guard is worth
     nothing if behaviour can be added in a sibling module inside the same boundary.
@@ -221,12 +233,19 @@ def _recorded_module_sources() -> list[Path]:
     return sorted(
         source
         for module in recorded_modules()
+        if module.split(".")[0] not in FILLED_BOUNDARIES
         for source in (PACKAGE_ROOT / Path(module.replace(".", "/"))).rglob("*.py")
     )
 
 
 def test_recorded_modules_carry_no_behaviour() -> None:
-    """Each recorded module is a boundary and nothing else (FR-004, SC-007).
+    """A recorded module no feature has filled is a boundary and nothing else (FR-004, SC-007).
+
+    **Narrowed again by 003-logging-telemetry-baseline, deliberately.** That feature fills
+    ``observability``, which this check had held empty. Rather than delete the check or widen it to
+    nothing, the modules a feature has filled are named in ``FILLED_BOUNDARIES`` above: the other
+    fourteen stay guarded, and filling one is a deliberate edit in the commit that fills it
+    (specs/003-logging-telemetry-baseline/research.md R14).
 
     **Narrowed by 002-environment-configuration, deliberately.** The previous version walked every
     ``.py`` under the package root, and its own docstring said "The first feature to write real
