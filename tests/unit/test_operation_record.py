@@ -48,9 +48,8 @@ def test_one_record_carries_every_field_section_18_names(rendered: Rendered) -> 
 
     record = rendered.one()
 
-    assert SECTION_18_FIELDS <= set(record), (
-        f"Missing from the record: {sorted(SECTION_18_FIELDS - set(record))}"
-    )
+    missing = sorted(SECTION_18_FIELDS - set(record))
+    assert not missing, f"Missing from the record: {missing}"
     assert record["event"] == "ingestion.operation"
     assert record["source"] == "chatgpt"
     assert record["source_id"] == "abc-123"
@@ -99,9 +98,11 @@ def test_a_failure_is_recorded_and_still_reaches_the_caller(rendered: Rendered) 
     handled. Deciding that one failure must not abort a run is §18's instruction to the *caller*;
     this surface does not get to make it.
     """
-    with pytest.raises(RuntimeError, match="the export was truncated"):
-        with ingestion_operation(**AN_OPERATION):
-            raise RuntimeError("the export was truncated")
+    with (
+        pytest.raises(RuntimeError, match="the export was truncated"),
+        ingestion_operation(**AN_OPERATION),
+    ):
+        raise RuntimeError("the export was truncated")
 
     record = rendered.one()
 
@@ -113,9 +114,11 @@ def test_a_failure_is_recorded_and_still_reaches_the_caller(rendered: Rendered) 
 
 def test_the_duration_is_measured_rather_than_supplied(rendered: Rendered) -> None:
     """Check 4 — a caller cannot report a duration it did not spend (FR-005)."""
-    with pytest.raises(TypeError):
-        with ingestion_operation(**AN_OPERATION, duration_ms=0):  # type: ignore[call-arg]
-            pass
+    with (
+        pytest.raises(TypeError),
+        ingestion_operation(**AN_OPERATION, duration_ms=0),  # type: ignore[call-arg]
+    ):
+        pass
 
 
 def test_the_duration_and_start_time_describe_the_operation(rendered: Rendered) -> None:
@@ -161,9 +164,8 @@ def test_context_does_not_outlive_the_operation(rendered: Rendered) -> None:
 
 def test_context_does_not_outlive_a_failed_operation(rendered: Rendered) -> None:
     """The path that actually leaks: unbinding on the happy path only is the usual mistake."""
-    with pytest.raises(RuntimeError):
-        with ingestion_operation(**AN_OPERATION):
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), ingestion_operation(**AN_OPERATION):
+        raise RuntimeError("boom")
 
     get_logger().info("afterwards")
 
