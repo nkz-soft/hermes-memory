@@ -338,6 +338,9 @@ Two independent layers:
 The content hash is computed over a canonical representation of the normalized
 conversation.
 
+ADR-006 settles what that representation covers, and what a re-run does with a
+conversation that grew, disappeared or was renamed between two exports.
+
 ## 18. Error handling, retry and observability
 
 Import proceeds conversation by conversation; one failure must not abort the
@@ -559,3 +562,70 @@ environment per worktree. That worktree sits inside the checkout, at
 it: a path outside the working directory costs a permission prompt on every file
 the run touches, which would leave the loop stopping far more often than at its
 one intended gate.
+
+### ADR-006 — History is re-exported periodically, imported incrementally
+
+**Decision.** After the first import, history stays current through a fresh full
+export of the source, imported incrementally. Four questions the architecture
+left open are settled together, because they are one policy:
+
+1. **The refresh model.** The ChatGPT archive is cumulative — each export is a
+   superset of the previous one, not a delta — so a refresh is a new export
+   placed under `data/` and a re-run of the import, where the skip by source id
+   and content hash (§17) confines the cost to what is new or changed. The
+   export itself is requested by a person: no interface yields an account's
+   conversation history, and that is recorded here as a property of the source
+   rather than as missing tooling. How the archive arrives is outside this
+   decision — acquisition is a replaceable component whose default
+   implementation is manual placement — so automating it later changes nothing
+   below.
+2. **A conversation that continued** is replaced in full. `update_mode:
+   "replace"` stays the default for re-import, and `append` remains reserved for
+   its §9 purpose of delivering one oversized document as several items within a
+   single operation.
+3. **A conversation that disappeared stays.** The importer MUST NOT diff the raw
+   archive against an export, and MUST NOT derive removals from one. An absence
+   may be logged as an observation; nothing may act on it. Deliberate forgetting
+   is a separate, human-initiated operation on a named `document_id`, reserved
+   for content that must not be retained; it is out of scope for the MVP and
+   belongs to no import path.
+4. **The content hash covers content, not presentation.** The canonical
+   representation hashed under §17 includes the messages, their order and their
+   timestamps, and excludes the title and any metadata the importer itself
+   produces.
+
+**Rationale.** The cumulative archive makes a skip sufficient: nothing needs
+merging, and the expensive part of an import is extraction per conversation,
+which §17 already avoids for everything unchanged. Replacing a grown
+conversation rather than appending to it keeps re-import idempotent — a replay
+from the raw archive, which Principle I requires to stay possible, would
+otherwise append the same tail twice — and keeps extraction seeing the whole
+conversation, as §7 intends.
+
+Absence is not evidence of deletion. A truncated download, a partial export and
+a deliberate deletion arrive as the same input, and no signal separates them.
+The risk is asymmetric: a conversation wrongly kept costs some noise in recall,
+while one wrongly removed is unrecoverable, because by then it is gone from the
+source too. And were an absence able to empty the archive, the source service
+would hold a remote delete over a store whose whole purpose is independence from
+it (Principle I, ADR-001).
+
+Excluding the title from the hash keeps a rename from costing a full
+re-extraction; excluding importer-produced metadata keeps a version bump from
+invalidating the entire corpus at once.
+
+**Consequences.** Three costs, stated rather than softened. A conversation that
+keeps growing is re-extracted in full on every refresh in which it grew. A
+renamed conversation is skipped, so the title carried as metadata goes stale
+until some other change re-imports it. A conversation deleted in the source
+remains retrievable through memory, by design — and until deliberate forgetting
+exists, rebuilding the bank is the only remedy for a secret the sanitizer
+missed.
+
+The rule binds sources whose export cannot distinguish absence from deletion. A
+source that carries an explicit deletion event is a different case, decided in
+that source's own record (§2).
+
+Memory ages between refreshes and nothing forces one, so the `status` command
+reports the age of the last import: the decay is made visible rather than
+prevented.
