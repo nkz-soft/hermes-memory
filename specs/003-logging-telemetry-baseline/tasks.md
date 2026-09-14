@@ -30,13 +30,13 @@ testable on its own.
 **Purpose**: take the three runtime dependencies the stack table fixes, through the guard that
 exists to make that deliberate.
 
-- [ ] T001 Change `EXPECTED_RUNTIME_DEPENDENCIES` in `tests/structure/test_packaging.py` to
+- [X] T001 Change `EXPECTED_RUNTIME_DEPENDENCIES` in `tests/structure/test_packaging.py` to
   `{"pydantic", "pydantic-settings", "structlog", "opentelemetry-api", "opentelemetry-sdk"}` and
   rewrite its docstring to name the stack-table row permitting each addition (Logging → structlog;
   Telemetry → the two OpenTelemetry distributions), per research.md R14. Run
   `uv run pytest tests/structure/test_packaging.py` and **observe it fail** — the dependencies are
   not declared yet (check 34).
-- [ ] T002 Add the three dependencies with
+- [X] T002 Add the three dependencies with
   `uv add structlog opentelemetry-api opentelemetry-sdk`, committing the resulting `pyproject.toml`
   and `uv.lock`. Re-run the same command and observe it pass.
 
