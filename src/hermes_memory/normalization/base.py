@@ -11,11 +11,14 @@ Nothing in this module — or in any module beside it — may import Hindsight, 
 from __future__ import annotations
 
 import re
-from typing import Annotated
+from collections.abc import Mapping
+from typing import Annotated, Any, TypeVar
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, StringConstraints
 
-__all__ = ["FrozenModel", "OpaqueIdentifier", "Slug", "Timestamp"]
+__all__ = ["FrozenModel", "OpaqueIdentifier", "Slug", "Text", "Timestamp"]
+
+_Self = TypeVar("_Self", bound="FrozenModel")
 
 
 class FrozenModel(BaseModel):
@@ -32,6 +35,24 @@ class FrozenModel(BaseModel):
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    def model_copy(self: _Self, *, update: Mapping[str, Any] | None = None, deep: bool = False):
+        """Copy this value, revalidating whatever the copy changes.
+
+        `frozen=True` refuses assignment but not `model_copy(update=...)`, which by default writes
+        the new values straight into the copy without running a single validator. That is a hole
+        in FR-020 wide enough for the next feature to walk through: §7's sanitizer returns a
+        rewritten conversation (#12), and this is the obvious way to write one — so an unvalidated
+        value would land in the archive that Principle I makes the source of truth, where it is
+        permanent.
+
+        Revalidating makes "every entity validates on construction" true of every entity that
+        exists, rather than of every entity that was built the long way.
+        """
+        copied = super().model_copy(update=update, deep=deep)
+        if update is None:
+            return copied
+        return type(self).model_validate(dict(copied))
 
 
 _UNUSABLE_IN_AN_IDENTIFIER = re.compile(r"[\s\x00-\x1f\x7f]")
@@ -69,6 +90,31 @@ Tags are the only scoping mechanism there is, and a typo in one does not fail: i
 conversation where nobody will look for it. Hence a closed shape rather than a free string. `:` is
 excluded in particular, because a slug containing one would forge a second namespace when the tag
 is rendered (research.md R9).
+"""
+
+
+def _reject_unencodable_text(value: str) -> str:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as broken:
+        raise ValueError(
+            "text must be encodable as UTF-8; it contains an unpaired surrogate at position "
+            f"{broken.start}"
+        ) from broken
+    return value
+
+
+Text = Annotated[str, AfterValidator(_reject_unencodable_text)]
+"""Text carried from a source: anything that can be written down, and nothing that cannot.
+
+Deliberately permissive — this corpus is Russian-language engineering history full of logs, stack
+traces and emoji, and a rule that admitted only ASCII would refuse the data the system exists for.
+
+The one thing refused is a string that cannot be encoded, which in practice means an unpaired
+surrogate. JSON carries `\\udXXX` escapes and `json.loads` hands them back as-is, so a real export
+can contain one. Unrefused, it constructs happily and then breaks the content hash deep inside an
+import run, with a codec error naming neither the conversation nor the field — long after FR-020
+promised the value had been validated.
 """
 
 

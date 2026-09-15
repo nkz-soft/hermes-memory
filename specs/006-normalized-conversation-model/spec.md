@@ -227,8 +227,12 @@ the normalization module and observe the suite fail.
 ### Measurable Outcomes
 
 - **SC-001**: All six boundaries of §8 can be declared using only the entities defined here, with no
-  additional type invented and no dictionary or free-form string carrying a field the architecture
-  requires.
+  *conversation-shaped* type invented and no dictionary or free-form string carrying a field the
+  architecture requires. Two boundaries legitimately need a type of their own — the sanitizer's
+  report of what it redacted (§8) and the import state's record (§17) — and #9 and #14 define those;
+  what this criterion forbids is a second way of describing a conversation, its provenance or its
+  tags. Reworded during implementation: as first written it said "no additional type", which those
+  two would have breached on the day they are built.
 - **SC-002**: Every conversation in the test fixtures survives serialization and re-parsing
   unchanged, including one that exercises every optional field.
 - **SC-003**: Two structurally identical conversations produce the same content hash when computed

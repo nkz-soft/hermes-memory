@@ -15,9 +15,9 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
-from hermes_memory.normalization.base import FrozenModel, OpaqueIdentifier, Slug, Timestamp
+from hermes_memory.normalization.base import FrozenModel, OpaqueIdentifier, Slug, Text, Timestamp
 from hermes_memory.normalization.conversation import Conversation, Source
-from hermes_memory.normalization.tags import AnyTag
+from hermes_memory.normalization.tags import AnyTag, ProjectTag, SourceTag
 
 __all__ = ["EnrichedConversation", "Provenance"]
 
@@ -33,10 +33,10 @@ class Provenance(FrozenModel):
     source: Source
     source_id: OpaqueIdentifier
     project: Slug
-    repository: str | None = None
-    title: str | None = None
+    repository: Text | None = None
+    title: Text | None = None
     imported_at: Timestamp
-    importer_version: str = Field(min_length=1)
+    importer_version: Text = Field(min_length=1)
 
 
 class EnrichedConversation(FrozenModel):
@@ -77,6 +77,31 @@ class EnrichedConversation(FrozenModel):
                 f"provenance source_id ({self.provenance.source_id!r}) does not match the "
                 f"conversation's ({self.conversation.source_id!r})"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _the_tags_agree_with_what_they_scope(self) -> EnrichedConversation:
+        """A tag that contradicts the conversation it scopes is worse than a missing one.
+
+        Tags are the only scoping mechanism there is (ADR-002), so a wrong one fails nothing at
+        the time and files the conversation where nobody will look for it afterwards. The two that
+        can contradict something already known are checked here: `source:` against the
+        conversation's own source — which the document id (§10) is built from — and `project:`
+        against the project classification resolved into the provenance (§15).
+
+        Every other tag is enrichment's business. This constrains disagreement, not tagging.
+        """
+        for tag in self.tags:
+            if isinstance(tag, SourceTag) and tag.value != self.conversation.source:
+                raise ValueError(
+                    f"tag {tag} names a source the conversation does not have "
+                    f"({self.conversation.source})"
+                )
+            if isinstance(tag, ProjectTag) and tag.value != self.provenance.project:
+                raise ValueError(
+                    f"tag {tag} names a project the provenance does not have "
+                    f"({self.provenance.project})"
+                )
         return self
 
     @model_validator(mode="after")

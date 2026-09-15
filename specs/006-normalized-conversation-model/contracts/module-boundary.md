@@ -15,8 +15,14 @@ from the files inside it, so the internal split of R14 can change without touchi
 | `Source`, `Role`, `NonTextKind`, `ConversationType`, `TagNamespace` | closed vocabularies | `conversation.py`, `tags.py` |
 | `Conversation`, `Message`, `ToolActivity`, `NonTextPart` | the conversation tree | `conversation.py` |
 | `Provenance`, `EnrichedConversation` | §3.3 provenance and the enrich-stage pairing | `provenance.py` |
-| `Tag`, `SourceTag`, `ProjectTag`, `TypeTag`, `UserTag` | the §6 vocabulary | `tags.py` |
+| `Tag`, `SourceTag`, `ProjectTag`, `TypeTag`, `UserTag`, `AnyTag` | the §6 vocabulary | `tags.py` |
 | `canonical_form`, `canonical_bytes`, `content_hash`, `CANONICAL_VERSION` | the §17 hash (see [canonical-form.md](./canonical-form.md)) | `canonical.py` |
+
+`AnyTag` was added to this list during implementation, and not by choice: a field annotated with the
+abstract `Tag` rebuilds `Tag` when a record comes back from the raw archive, and `Tag` refuses to be
+built. So a *field* holding tags carries the discriminated union, while `Tag` stays what a function
+signature names when it merely accepts one. The round-trip test is what found this, which is the
+argument for having written it before the code.
 
 `canonical_bytes` and `CANONICAL_VERSION` were added to this list during implementation. The
 payload, its byte form and the digest over it are three separately testable steps, and a test that

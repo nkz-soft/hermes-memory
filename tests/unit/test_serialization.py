@@ -122,6 +122,16 @@ def test_an_absent_message_time_does_not_become_a_present_one() -> None:
     assert restored.messages[1].sent_at is None
 
 
+def test_a_utc_offset_survives_the_round_trip() -> None:
+    """Equality alone cannot see this: aware datetimes compare by instant, so a value silently
+    converted to UTC on the way out would still satisfy every assertion above."""
+    original = an_exhaustive_conversation()
+    restored = Conversation.model_validate_json(original.model_dump_json())
+
+    assert restored.last_activity_at is not None
+    assert restored.last_activity_at.utcoffset() == timedelta(hours=3)
+
+
 def test_the_message_order_survives_the_round_trip() -> None:
     original = an_exhaustive_conversation()
     restored = Conversation.model_validate_json(original.model_dump_json())

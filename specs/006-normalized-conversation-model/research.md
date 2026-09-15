@@ -214,6 +214,16 @@ the hash up by (§17), not part of what is being compared. Including them would 
 conversation depend on the identity it is already filed under, which changes nothing and hides the
 distinction.
 
+**The conversation's own timestamps were the loose end here, and the first version of this record
+papered over it** by listing them alongside the source and the native id as "the key" — which they
+are not; the import state files by source id, not by start time. ADR-006 decision 4 does not settle
+them either way: it names the messages' timestamps, and excludes the title and importer-produced
+metadata, and `started_at` is none of those. They stay excluded, for the reasons now written out in
+[contracts/canonical-form.md](./contracts/canonical-form.md), together with the consequence that
+follows — a corrected start time goes stale in the bank exactly as a rename does. Recording the
+consequence is what makes this a decision rather than an oversight; changing the trade would be an
+amendment to ADR-006, not an edit here.
+
 ## R12 — The boundary of Principle IV is enforced twice, statically and at runtime
 
 **Decision.** Two tests. A static one parses every source file under `normalization/` and asserts

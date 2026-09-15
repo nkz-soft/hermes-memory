@@ -38,7 +38,20 @@ against, rather than a silent divergence. Changing the coverage means incrementi
 commit that states what re-extracts as a result.
 """
 
-_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+
+def _format(moment: datetime) -> str:
+    """Render a UTC datetime, without asking the platform how to do it.
+
+    `strftime("%Y")` is the one remaining platform dependency in a function whose whole purpose is
+    platform independence: below year 1000 it zero-pads on some C libraries and not on others. No
+    real export reaches that, and a determinism routine that is deterministic only for plausible
+    inputs is not what §17 needs.
+    """
+    return (
+        f"{moment.year:04d}-{moment.month:02d}-{moment.day:02d}"
+        f"T{moment.hour:02d}:{moment.minute:02d}:{moment.second:02d}"
+        f".{moment.microsecond:06d}Z"
+    )
 
 
 def _render(moment: datetime | None) -> str | None:
@@ -54,7 +67,7 @@ def _render(moment: datetime | None) -> str | None:
     """
     if moment is None:
         return None
-    return moment.astimezone(UTC).strftime(_TIMESTAMP_FORMAT) + "Z"
+    return _format(moment.astimezone(UTC))
 
 
 def _message_form(message: Message) -> dict[str, Any]:
@@ -85,9 +98,17 @@ def canonical_form(conversation: Conversation) -> dict[str, Any]:
     produced without a custom encoder. A value needing one would be a value whose rendering nobody
     decided.
 
-    The title, the source, the native id and the conversation's own timestamps are absent. The
-    first because ADR-006 excludes it; the rest because they are the key this hash is filed under
-    in the import state, not part of what is being compared.
+    The title is absent because ADR-006 decision 4 excludes it. The source and the native id are
+    absent because they are the key this hash is filed under in the import state, not part of what
+    is being compared.
+
+    The conversation's own `started_at` and `last_activity_at` are absent too, and that one is this
+    feature's decision rather than the ADR's — it names the *messages'* timestamps. They are
+    excluded because a start time is a property of the conversation rather than of what was said,
+    and because including them would re-extract the whole corpus the day a parser learns to fill in
+    `last_activity_at`. The consequence — a corrected start time goes stale in the bank exactly as
+    a rename does — is written down in `contracts/canonical-form.md`, where changing the trade is
+    named as an amendment to ADR-006 rather than an edit here.
     """
     return {
         "version": CANONICAL_VERSION,

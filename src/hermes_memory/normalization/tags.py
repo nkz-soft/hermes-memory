@@ -58,6 +58,12 @@ class Tag(FrozenModel):
     directly — one of the four concrete forms below must be, because each of those is what
     validates the value against its namespace. A constructible base would be a hole in the
     convention it exists to describe.
+
+    The four are the whole set: a fifth subclass defined elsewhere would inherit the namespace and
+    value fields without inheriting a rule about what its value may be. Nothing prevents that, and
+    nothing needs to — `AnyTag` is what fields accept, so such a tag is refused the moment it meets
+    an `EnrichedConversation`. Adding a namespace means amending `TagNamespace`, which means
+    amending §6.
     """
 
     namespace: TagNamespace

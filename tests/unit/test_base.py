@@ -18,7 +18,13 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 from pydantic import ValidationError
 
-from hermes_memory.normalization.base import FrozenModel, OpaqueIdentifier, Slug, Timestamp
+from hermes_memory.normalization.base import (
+    FrozenModel,
+    OpaqueIdentifier,
+    Slug,
+    Text,
+    Timestamp,
+)
 
 
 class Example(FrozenModel):
@@ -27,6 +33,7 @@ class Example(FrozenModel):
     identifier: OpaqueIdentifier
     slug: Slug
     at: Timestamp
+    body: Text = ""
 
 
 def an_example(**overrides: object) -> Example:
@@ -137,6 +144,73 @@ def test_a_malformed_slug_is_refused(slug: str) -> None:
         an_example(slug=slug)
 
     assert "slug" in str(failure.value)
+
+
+def test_text_that_cannot_be_encoded_is_refused() -> None:
+    """A lone surrogate reaches the model from a real export, and breaks the hash, not the parse.
+
+    JSON carries unpaired `\\udXXX` escapes and `json.loads` hands them back as-is, so a ChatGPT
+    export can contain one. Left alone, the failure surfaces deep in the import loop as a codec
+    error naming neither the conversation nor the field — long after FR-020 promised the value was
+    validated. It is refused where it enters instead.
+    """
+    with pytest.raises(ValidationError) as failure:
+        an_example(body="before \ud800 after")
+
+    assert "body" in str(failure.value)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param("", id="empty"),
+        pytest.param("почему retain падает?", id="non-ascii"),
+        pytest.param("emoji 🙂 and a tab\there", id="emoji and control whitespace"),
+        # A paired surrogate is an ordinary astral-plane character, and must not be caught by a
+        # rule aimed at unpaired ones. Written as an escape rather than literally, because the
+        # linter flags fraktur letters as visually ambiguous — which, in a test about encoding,
+        # it is right to.
+        pytest.param("an astral character: \U0001d573", id="astral plane"),
+    ],
+)
+def test_ordinary_text_is_accepted(body: str) -> None:
+    """The rule is about what cannot be encoded, not about what looks unusual.
+
+    This corpus is Russian-language engineering history full of logs and stack traces; a text rule
+    that refused anything but ASCII would refuse the data the system exists for.
+    """
+    assert an_example(body=body).body == body
+
+
+# --- copying -----------------------------------------------------------------------------------
+
+
+def test_copying_with_an_update_revalidates() -> None:
+    """`frozen=True` stops assignment but not `model_copy(update=...)`, which skips validation.
+
+    That matters here more than it would elsewhere: §7's sanitizer returns a rewritten conversation
+    (#12), and `model_copy(update={"messages": ...})` is the obvious way to write it. Unchecked, it
+    would put a value nothing validated into the archive Principle I makes the source of truth —
+    which is the one place an invalid value is permanent.
+    """
+    example = an_example()
+
+    with pytest.raises(ValidationError) as failure:
+        example.model_copy(update={"identifier": "has a space"})
+
+    assert "identifier" in str(failure.value)
+
+
+def test_copying_with_a_valid_update_still_works() -> None:
+    """Revalidation is not a prohibition: the supported way to derive a value stays supported."""
+    assert an_example().model_copy(update={"slug": "hermes-memory"}).slug == "hermes-memory"
+
+
+def test_copying_without_an_update_is_unchanged() -> None:
+    """The no-update path is pydantic's own, and stays it."""
+    example = an_example()
+
+    assert example.model_copy() == example
 
 
 @pytest.mark.parametrize(

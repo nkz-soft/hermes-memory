@@ -163,6 +163,46 @@ def test_provenance_naming_another_source_is_refused() -> None:
     assert "source" in str(failure.value)
 
 
+def test_a_source_tag_naming_another_source_is_refused() -> None:
+    """The same argument as provenance, one field over: a wrong tag is worse than a missing one.
+
+    Tags are the only scoping mechanism there is (ADR-002), and `source:codex` on a ChatGPT
+    conversation does not fail anything — it files the conversation where nobody will look, and
+    contradicts the document id at the same time.
+    """
+    with pytest.raises(ValidationError) as failure:
+        EnrichedConversation(
+            conversation=a_conversation(),
+            provenance=a_provenance(),
+            tags=(SourceTag(value=Source.CODEX),),
+        )
+
+    assert "source" in str(failure.value)
+
+
+def test_a_project_tag_disagreeing_with_the_provenance_is_refused() -> None:
+    """One conversation belongs to one project; two answers to that question is a defect."""
+    with pytest.raises(ValidationError) as failure:
+        EnrichedConversation(
+            conversation=a_conversation(),
+            provenance=a_provenance(project="miratorg"),
+            tags=(ProjectTag(value="something-else"),),
+        )
+
+    assert "project" in str(failure.value)
+
+
+def test_the_agreeing_tags_are_accepted() -> None:
+    """The check constrains disagreement, not tagging: the ordinary case still passes."""
+    enriched = EnrichedConversation(
+        conversation=a_conversation(),
+        provenance=a_provenance(project="miratorg"),
+        tags=(SourceTag(value=Source.CHATGPT), ProjectTag(value="miratorg"), UserTag(value="nkz")),
+    )
+
+    assert len(enriched.tags) == 3
+
+
 def test_duplicate_tags_are_refused() -> None:
     """Sending the same tag twice is a parser bug; the boundary is where it is cheap to catch."""
     with pytest.raises(ValidationError) as failure:
@@ -179,7 +219,10 @@ def test_two_tags_sharing_a_value_across_namespaces_are_not_duplicates() -> None
     """`project:nkz` and `user:nkz` are different scopes, and both may be present."""
     enriched = EnrichedConversation(
         conversation=a_conversation(),
-        provenance=a_provenance(),
+        # The project deliberately matches the tag: what is under test is that two namespaces
+        # sharing a value are not duplicates, not whether the project agrees — which is
+        # `test_a_project_tag_disagreeing_with_the_provenance_is_refused` above.
+        provenance=a_provenance(project="nkz"),
         tags=(ProjectTag(value="nkz"), UserTag(value="nkz")),
     )
 

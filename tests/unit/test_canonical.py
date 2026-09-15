@@ -245,7 +245,11 @@ def test_changed_tool_activity_moves_the_hash() -> None:
         messages=(a_message(tool_activity=(ToolActivity(name="web.search", result="200"),)),)
     )
 
-    assert content_hash(with_a_tool) != content_hash(with_another) != content_hash(a_conversation())
+    # Three separate comparisons, not a chain: `a != b != c` never compares a with c, so a chained
+    # assertion here would pass even if adding a tool call left the hash alone.
+    assert content_hash(with_a_tool) != content_hash(with_another)
+    assert content_hash(with_a_tool) != content_hash(a_conversation())
+    assert content_hash(with_another) != content_hash(a_conversation())
 
 
 def test_a_changed_non_text_part_moves_the_hash() -> None:

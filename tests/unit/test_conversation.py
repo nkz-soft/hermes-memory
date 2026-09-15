@@ -7,6 +7,8 @@ the immutability that lets a stage return a new conversation instead of editing 
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
@@ -193,6 +195,26 @@ def test_a_naive_message_timestamp_is_refused() -> None:
     assert "sent_at" in str(failure.value)
 
 
+def test_text_that_cannot_be_encoded_is_refused_at_the_message() -> None:
+    """The shared rule, wired to the field an export actually delivers it through.
+
+    Left to reach the canonical form, a lone surrogate breaks the content hash mid-import with a
+    codec error that names nothing (research R2, the base module's `Text`).
+    """
+    with pytest.raises(ValidationError) as failure:
+        a_message(text="before \ud800 after")
+
+    assert "text" in str(failure.value)
+
+
+def test_text_that_cannot_be_encoded_is_refused_in_tool_output() -> None:
+    """Tool results are the likeliest carrier: they are machine output, not typed prose."""
+    with pytest.raises(ValidationError) as failure:
+        ToolActivity(name="repo.read", result="before \ud800 after")
+
+    assert "result" in str(failure.value)
+
+
 def test_a_conversation_must_carry_a_start() -> None:
     """§11 makes the real time load-bearing for temporal retrieval; it is not optional."""
     with pytest.raises(ValidationError) as failure:
@@ -225,11 +247,29 @@ def test_every_source_derives_the_shape_the_architecture_records(
     assert a_conversation(source=source, source_id="x").document_id == expected
 
 
-def test_the_document_id_is_stable_across_derivations() -> None:
-    """Principle II: stable across runs. The same value every time it is asked for."""
-    conversation = a_conversation()
+def test_the_document_id_is_stable_across_processes() -> None:
+    """Principle II: stable across runs, which is a claim one interpreter cannot make.
 
-    assert conversation.document_id == conversation.document_id
+    Comparing a conversation's `document_id` with itself would pass against an implementation
+    returning `uuid4()` per instance — and "a freshly generated identifier per import run" is the
+    exact defect the principle names. So the value is derived in a fresh interpreter and compared
+    with this one's.
+    """
+    derived_elsewhere = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from datetime import UTC, datetime\n"
+            "from hermes_memory.normalization import Conversation, Source\n"
+            "print(Conversation(source=Source.CHATGPT, source_id='conversation-id',"
+            " started_at=datetime(2026, 1, 1, 9, tzinfo=UTC)).document_id)",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+    assert derived_elsewhere == a_conversation().document_id == "chatgpt:conversation-id"
 
 
 def test_the_document_id_cannot_be_supplied() -> None:

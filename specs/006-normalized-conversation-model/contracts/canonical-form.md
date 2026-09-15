@@ -19,6 +19,24 @@ recorded there. The source and native id are excluded because they are the key t
 under, not part of what is compared (R11). `Provenance` is excluded because it is metadata the
 importer produces.
 
+**The conversation's own timestamps are a separate decision, and ADR-006 does not make it.** Its
+decision 4 names the *messages'* timestamps as covered, and excludes the title and importer-produced
+metadata; `started_at` and `last_activity_at` are neither. They are excluded here, deliberately,
+and the reasoning is this feature's rather than the ADR's:
+
+* Nothing else about the conversation is covered — not the title, not the identity — and a start
+  time is a property of the conversation, not of its content. The messages and their own timestamps
+  are what a reader would call "what was said, and when".
+* Including them would make a parser improvement expensive. `last_activity_at` is absent for the MVP
+  source; the day a parser learns to populate it, every conversation in the corpus would re-extract,
+  for a value no retrieval reads.
+
+**The consequence, stated rather than discovered**: exactly as with a rename, a corrected start time
+does not re-import on its own. The value held in the bank goes stale until some other change to the
+conversation moves the hash, or until the forced re-import ADR-006 requires of the import state is
+run. If that trade is judged wrong, the fix is an amendment to ADR-006 — a governance change, out
+of this feature's scope — and not a quiet edit to the function below.
+
 The included set is written out by name in the implementation, never derived from a dump of the
 model, so that a field added later is outside the hash until a commit deliberately puts it in (R1).
 

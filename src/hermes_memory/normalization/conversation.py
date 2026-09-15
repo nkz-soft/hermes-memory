@@ -18,7 +18,7 @@ from enum import StrEnum
 
 from pydantic import Field, model_validator
 
-from hermes_memory.normalization.base import FrozenModel, OpaqueIdentifier, Timestamp
+from hermes_memory.normalization.base import FrozenModel, OpaqueIdentifier, Text, Timestamp
 
 __all__ = [
     "Conversation",
@@ -83,7 +83,7 @@ class NonTextPart(FrozenModel):
     """
 
     kind: NonTextKind
-    name: str | None = None
+    name: Text | None = None
 
 
 class ToolActivity(FrozenModel):
@@ -98,9 +98,9 @@ class ToolActivity(FrozenModel):
     contains.
     """
 
-    name: str = Field(min_length=1)
-    request: str | None = None
-    result: str | None = None
+    name: Text = Field(min_length=1)
+    request: Text | None = None
+    result: Text | None = None
 
 
 class Message(FrozenModel):
@@ -114,7 +114,7 @@ class Message(FrozenModel):
     """
 
     role: Role
-    text: str
+    text: Text
     sent_at: Timestamp | None = None
     tool_activity: tuple[ToolActivity, ...] = ()
     non_text_parts: tuple[NonTextPart, ...] = ()
@@ -130,7 +130,7 @@ class Conversation(FrozenModel):
 
     source: Source
     source_id: OpaqueIdentifier
-    title: str | None = None
+    title: Text | None = None
     started_at: Timestamp
     last_activity_at: Timestamp | None = None
     messages: tuple[Message, ...] = ()

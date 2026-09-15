@@ -77,9 +77,10 @@ c = Conversation(
     started_at=datetime(2026, 1, 1, 9, tzinfo=UTC),
     messages=(Message(role=Role.USER, text='why does retain fail here?'),),
 )
+renamed = Conversation(**{**c.model_dump(), 'title': 'Renamed'})
 print(c.document_id)
 print(c.content_hash())
-print(c.model_copy(update={'title': 'Renamed'}).content_hash() == c.content_hash())
+print(renamed.content_hash() == c.content_hash())
 "
 ```
 
@@ -92,6 +93,11 @@ True
 ```
 
 The third line is ADR-006 decision 4 in one assertion: a rename does not re-extract.
+
+The rename is made by rebuilding rather than with `model_copy(update=...)` on purpose. That call
+skips every validator by default, which is why `FrozenModel` overrides it to revalidate — see
+`tests/unit/test_base.py::test_copying_with_an_update_revalidates`. Either form is safe now;
+constructing is the one to reach for, because it is safe in any model, not only in these.
 
 ## 7. The diff is confined
 

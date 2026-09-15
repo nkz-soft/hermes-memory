@@ -50,8 +50,12 @@ FORBIDDEN_AT_RUNTIME = (
     "urllib.request",
     "urllib3",
     "aiohttp",
+    "socket",
+    "http.client",
     "sqlalchemy",
     "sqlite3",
+    "shelve",
+    "dbm",
     "boto3",
 )
 """Named explicitly because these are the ones that would actually be reached for.
