@@ -255,11 +255,21 @@ already there for `observability` and `cli`.
 ```text
 src/hermes_memory/normalization/
 ├── __init__.py       # the module's public surface, re-exporting the names below
+├── base.py           # the frozen value base and the two validated string types
 ├── conversation.py   # Conversation, Message, ToolActivity, NonTextPart, Role, Source
 ├── provenance.py     # Provenance, and the enrichment record pairing it with a conversation
 ├── tags.py           # Tag and its four namespaces
 └── canonical.py      # the canonical form and the content hash
 ```
+
+**`base.py` was added during implementation, and the addition is recorded here rather than only in
+a commit message** — the constitution requires a deviation from a committed plan to be justified in
+writing. The plan listed four files; the frozen model configuration, the opaque-identifier type and
+the slug type are needed by `conversation.py`, `provenance.py` and `tags.py` alike, and putting
+them in any one of the three would have made the other two import it for a reason unrelated to what
+that file is about — the exact coupling this split exists to avoid. It changes no decision above:
+the axes of change are unaltered, and a reviewer checking the hash against ADR-006 still reads one
+file.
 
 **Rationale.** Four files rather than one because the four have different reasons to change — a new
 source touches `conversation.py`, a new tag namespace touches `tags.py`, and ADR-006 governs

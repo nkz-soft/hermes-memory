@@ -163,12 +163,14 @@ specs/006-normalized-conversation-model/
 ```text
 src/hermes_memory/normalization/
 ├── __init__.py                  # the public surface; re-exports, __all__
+├── base.py                      # frozen value base, opaque identifier and slug types
 ├── conversation.py              # Conversation, Message, ToolActivity, NonTextPart, Role, Source
 ├── provenance.py                # Provenance, EnrichedConversation
 ├── tags.py                      # Tag and its four namespaces
 └── canonical.py                 # canonical_form, content_hash
 
 tests/unit/
+├── test_base.py                 # the shared value semantics: frozen, extra-forbid, aware, slug
 ├── test_conversation.py         # construction, validation, ordering, immutability
 ├── test_provenance.py           # §3.3 fields, the conversation/provenance pairing
 ├── test_tags.py                 # the §6 convention, rendering, rejection of malformed values
@@ -181,7 +183,7 @@ tests/structure/
 ```
 
 **Structure Decision**: The module split follows the axes along which these things change (research
-R14) — a new source touches `conversation.py`, a new tag namespace touches `tags.py`, and ADR-006
+R14 — which also records why `base.py` was added to the four files this plan originally listed) — a new source touches `conversation.py`, a new tag namespace touches `tags.py`, and ADR-006
 governs `canonical.py` alone, so a reviewer checking the hash against the ADR has one file to read.
 Tests mirror the split, and follow the existing convention where `tests/structure/` holds checks
 about the shape of the repository and `tests/unit/` holds checks about behaviour.
