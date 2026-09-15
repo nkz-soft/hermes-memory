@@ -135,6 +135,34 @@ class Conversation(FrozenModel):
     last_activity_at: Timestamp | None = None
     messages: tuple[Message, ...] = ()
 
+    @property
+    def document_id(self) -> str:
+        """`<source>:<native id>` — the identity of ARCHITECTURE.md §10.
+
+        Derived, with no field behind it, because Principle II forbids a freshly generated
+        identifier per import run: that is what turns a re-import into duplicated memory. There is
+        nothing to pass, and `extra="forbid"` refuses an attempt to pass one anyway.
+
+        The native id is never split back out of this, so a colon inside it is harmless
+        (research.md R10).
+        """
+        return f"{self.source.value}:{self.source_id}"
+
+    def canonical_form(self) -> dict[str, object]:
+        """This conversation's deterministic representation (§17, ADR-006 decision 4)."""
+        # Imported here rather than at module scope: `canonical` reduces a conversation, so it
+        # imports this module. The alternative — moving these two methods out — would mean a caller
+        # holding a conversation could not ask it for its own identity.
+        from hermes_memory.normalization import canonical
+
+        return canonical.canonical_form(self)
+
+    def content_hash(self) -> str:
+        """The §17 hash the import state stores, so an unchanged conversation is skipped."""
+        from hermes_memory.normalization import canonical
+
+        return canonical.content_hash(self)
+
     @model_validator(mode="after")
     def _activity_does_not_precede_the_start(self) -> Conversation:
         """A conversation that ended before it began is a parser bug, caught at the boundary.

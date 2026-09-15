@@ -17,7 +17,7 @@ from pydantic import Field, model_validator
 
 from hermes_memory.normalization.base import FrozenModel, OpaqueIdentifier, Slug, Timestamp
 from hermes_memory.normalization.conversation import Conversation, Source
-from hermes_memory.normalization.tags import Tag
+from hermes_memory.normalization.tags import AnyTag
 
 __all__ = ["EnrichedConversation", "Provenance"]
 
@@ -49,7 +49,20 @@ class EnrichedConversation(FrozenModel):
 
     conversation: Conversation
     provenance: Provenance
-    tags: tuple[Tag, ...] = ()
+    # `AnyTag` rather than `Tag`: a field typed as the base would rebuild the base when this comes
+    # back from the raw archive, and the base refuses to be built (see `tags.AnyTag`).
+    tags: tuple[AnyTag, ...] = ()
+
+    @property
+    def document_id(self) -> str:
+        """Delegated (§10), so a caller holding this never reaches past it to rebuild the id."""
+        return self.conversation.document_id
+
+    def content_hash(self) -> str:
+        """Delegated (§17). Neither the provenance nor the tags are part of it: ADR-006 excludes
+        importer-produced metadata, which is what keeps a changed importer version from
+        re-extracting the whole corpus on an ordinary refresh."""
+        return self.conversation.content_hash()
 
     @model_validator(mode="after")
     def _provenance_describes_this_conversation(self) -> EnrichedConversation:

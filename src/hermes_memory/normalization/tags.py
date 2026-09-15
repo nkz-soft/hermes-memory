@@ -9,14 +9,15 @@ vocabulary, the value is validated, and the string form is produced in exactly o
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from hermes_memory.normalization.base import FrozenModel, Slug
 from hermes_memory.normalization.conversation import Source
 
 __all__ = [
+    "AnyTag",
     "ConversationType",
     "ProjectTag",
     "SourceTag",
@@ -106,3 +107,16 @@ class UserTag(Tag):
 
     namespace: Literal[TagNamespace.USER] = TagNamespace.USER
     value: Slug
+
+
+AnyTag = Annotated[SourceTag | ProjectTag | TypeTag | UserTag, Field(discriminator="namespace")]
+"""One of the four concrete tags, told apart by its namespace.
+
+This is what a *field* holding tags is annotated with, while `Tag` is what a function signature
+names when it merely accepts one. The distinction is not cosmetic: a field typed as the base would
+rebuild the base when a record comes back from the raw archive — and the base refuses to be built,
+because building it would pair a namespace with an unvalidated value.
+
+That failure is real rather than theoretical; `tests/unit/test_serialization.py` caught it on the
+first round trip of an enriched conversation.
+"""

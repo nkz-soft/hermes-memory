@@ -11,6 +11,12 @@ must touch `memory/hindsight` and nothing in this module.
 `tests/structure/test_normalization_boundary.py` enforces both.
 """
 
+from hermes_memory.normalization.canonical import (
+    CANONICAL_VERSION,
+    canonical_bytes,
+    canonical_form,
+    content_hash,
+)
 from hermes_memory.normalization.conversation import (
     Conversation,
     Message,
@@ -22,6 +28,7 @@ from hermes_memory.normalization.conversation import (
 )
 from hermes_memory.normalization.provenance import EnrichedConversation, Provenance
 from hermes_memory.normalization.tags import (
+    AnyTag,
     ConversationType,
     ProjectTag,
     SourceTag,
@@ -32,6 +39,8 @@ from hermes_memory.normalization.tags import (
 )
 
 __all__ = [
+    "CANONICAL_VERSION",
+    "AnyTag",
     "Conversation",
     "ConversationType",
     "EnrichedConversation",
@@ -48,4 +57,7 @@ __all__ = [
     "ToolActivity",
     "TypeTag",
     "UserTag",
+    "canonical_bytes",
+    "canonical_form",
+    "content_hash",
 ]

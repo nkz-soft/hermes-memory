@@ -201,6 +201,54 @@ def test_a_conversation_must_carry_a_start() -> None:
     assert "started_at" in str(failure.value)
 
 
+# --- document identity (ARCHITECTURE.md §10, Principle II) -------------------------------------
+
+
+def test_the_document_id_is_the_source_and_the_native_id() -> None:
+    """§10's scheme, built from the same `Source` constant the `source:` tag uses."""
+    assert a_conversation().document_id == "chatgpt:conversation-id"
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        pytest.param(Source.CHATGPT, "chatgpt:x", id="chatgpt"),
+        pytest.param(Source.CLAUDE_CHAT, "claude-chat:x", id="claude-chat"),
+        pytest.param(Source.CLAUDE_CODE, "claude-code:x", id="claude-code"),
+        pytest.param(Source.CODEX, "codex:x", id="codex"),
+        pytest.param(Source.HERMES, "hermes:x", id="hermes"),
+    ],
+)
+def test_every_source_derives_the_shape_the_architecture_records(
+    source: Source, expected: str
+) -> None:
+    assert a_conversation(source=source, source_id="x").document_id == expected
+
+
+def test_the_document_id_is_stable_across_derivations() -> None:
+    """Principle II: stable across runs. The same value every time it is asked for."""
+    conversation = a_conversation()
+
+    assert conversation.document_id == conversation.document_id
+
+
+def test_the_document_id_cannot_be_supplied() -> None:
+    """A freshly generated identifier per import run is what turns a re-import into duplicates.
+
+    There is no parameter to pass one through: `extra="forbid"` refuses the attempt rather than
+    accepting and ignoring it, which would be the quiet version of the same bug (FR-006).
+    """
+    with pytest.raises(ValidationError) as failure:
+        a_conversation(document_id="something-we-made-up")
+
+    assert "document_id" in str(failure.value)
+
+
+def test_a_native_id_containing_a_colon_keeps_its_colon() -> None:
+    """The id is never split back apart, so a colon inside it changes nothing (research R10)."""
+    assert a_conversation(source_id="a:b:c").document_id == "chatgpt:a:b:c"
+
+
 # --- immutability ------------------------------------------------------------------------------
 
 

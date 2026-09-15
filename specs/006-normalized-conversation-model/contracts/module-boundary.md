@@ -16,7 +16,13 @@ from the files inside it, so the internal split of R14 can change without touchi
 | `Conversation`, `Message`, `ToolActivity`, `NonTextPart` | the conversation tree | `conversation.py` |
 | `Provenance`, `EnrichedConversation` | §3.3 provenance and the enrich-stage pairing | `provenance.py` |
 | `Tag`, `SourceTag`, `ProjectTag`, `TypeTag`, `UserTag` | the §6 vocabulary | `tags.py` |
-| `canonical_form`, `content_hash` | the §17 hash (see [canonical-form.md](./canonical-form.md)) | `canonical.py` |
+| `canonical_form`, `canonical_bytes`, `content_hash`, `CANONICAL_VERSION` | the §17 hash (see [canonical-form.md](./canonical-form.md)) | `canonical.py` |
+
+`canonical_bytes` and `CANONICAL_VERSION` were added to this list during implementation. The
+payload, its byte form and the digest over it are three separately testable steps, and a test that
+re-derived the bytes with the same `json.dumps` call the implementation uses would assert only that
+the code equals itself — so the bytes are exported and pinned literally in
+`tests/unit/test_canonical.py`.
 
 `__all__` names them, and a test asserts that `__all__` and the module's actual public attributes
 agree — so a name added without being exported, or exported without existing, fails rather than
