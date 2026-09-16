@@ -18,7 +18,7 @@ from hermes_memory.ingestion import ConversationSource, ImportState
 from hermes_memory.memory.interface import MemoryStore
 from hermes_memory.normalization import Conversation
 from hermes_memory.sanitization import RedactionCategory, SecretSanitizer
-from tests.contracts import conversations
+from tests.contracts import conversations as conversations_module
 from tests.contracts.archive import RawArchiveContract
 from tests.contracts.classifier import ProjectClassifierContract
 from tests.contracts.sanitizer import SecretSanitizerContract
@@ -35,13 +35,14 @@ from tests.fakes.store import InMemoryMemoryStore, TagIndexedMemoryStore
 
 class TestInMemoryConversationSource(ConversationSourceContract):
     def make_source(self, conversations: tuple[Conversation, ...]) -> ConversationSource:
-        return InMemoryConversationSource(conversations)
+        return InMemoryConversationSource(conversations_module.as_read(*conversations))
 
     def make_source_with_one_unreadable(
         self, conversations: tuple[Conversation, ...]
     ) -> ConversationSource | None:
         return InMemoryConversationSource(
-            conversations, unreadable=frozenset({conversations[1].source_id})
+            conversations_module.as_read(*conversations),
+            unreadable=frozenset({conversations[1].source_id}),
         )
 
     def make_unreachable_source(self) -> ConversationSource | None:
@@ -53,7 +54,7 @@ class TestInMemorySecretSanitizer(SecretSanitizerContract):
         return InMemorySecretSanitizer()
 
     def secret_sample(self) -> tuple[str, RedactionCategory]:
-        return conversations.FAKE_SECRET, RedactionCategory.PASSWORD
+        return conversations_module.FAKE_SECRET, RedactionCategory.PASSWORD
 
     def make_failing_sanitizer(self) -> SecretSanitizer | None:
         return InMemorySecretSanitizer(fails=True)

@@ -14,27 +14,30 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from hermes_memory.ingestion import SourceFormatError, SourceUnavailable
-from hermes_memory.normalization import Conversation, Source
+from hermes_memory.ingestion import SourceConversation, SourceFormatError, SourceUnavailable
+from hermes_memory.normalization import Source
 
 
-class _ResumableReader(Iterator[Conversation]):
+class _ResumableReader(Iterator[SourceConversation]):
     """Yields conversations, raising for the unreadable ones without ending the iteration."""
 
-    def __init__(self, conversations: tuple[Conversation, ...], unreadable: frozenset[str]) -> None:
+    def __init__(
+        self, conversations: tuple[SourceConversation, ...], unreadable: frozenset[str]
+    ) -> None:
         self._conversations = conversations
         self._unreadable = unreadable
         self._position = 0
 
-    def __next__(self) -> Conversation:
+    def __next__(self) -> SourceConversation:
         while self._position < len(self._conversations):
-            conversation = self._conversations[self._position]
+            read = self._conversations[self._position]
             self._position += 1
-            if conversation.source_id in self._unreadable:
+            if read.conversation.source_id in self._unreadable:
                 raise SourceFormatError(
-                    "this conversation could not be parsed", subject=conversation.source_id
+                    "this conversation could not be parsed",
+                    subject=read.conversation.source_id,
                 )
-            return conversation
+            return read
         raise StopIteration
 
 
@@ -47,7 +50,7 @@ class InMemoryConversationSource:
 
     def __init__(
         self,
-        conversations: tuple[Conversation, ...] = (),
+        conversations: tuple[SourceConversation, ...] = (),
         *,
         source: Source = Source.CHATGPT,
         unreadable: frozenset[str] = frozenset(),
@@ -58,7 +61,7 @@ class InMemoryConversationSource:
         self._unreadable = unreadable
         self._unreachable = unreachable
 
-    def read(self) -> Iterator[Conversation]:
+    def read(self) -> Iterator[SourceConversation]:
         if self._unreachable:
             raise SourceUnavailable("the export could not be reached")
         return _ResumableReader(self._conversations, self._unreadable)

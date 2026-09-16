@@ -15,7 +15,7 @@ from __future__ import annotations
 import pytest
 
 from hermes_memory.errors import BoundaryError
-from tests.contracts import conversations
+from tests.contracts import conversations as conversations_module
 from tests.contracts.archive import RawArchiveContract
 from tests.contracts.classifier import ProjectClassifierContract
 from tests.contracts.sanitizer import SecretSanitizerContract
@@ -27,11 +27,14 @@ from tests.fakes import broken
 
 class _BrokenSource(ConversationSourceContract):
     def make_source(self, conversations):
-        return broken.SourceThatStopsAtTheFirstBadConversation(conversations, frozenset())
+        return broken.SourceThatStopsAtTheFirstBadConversation(
+            conversations_module.as_read(*conversations), frozenset()
+        )
 
     def make_source_with_one_unreadable(self, conversations):
         return broken.SourceThatStopsAtTheFirstBadConversation(
-            conversations, frozenset({conversations[1].source_id})
+            conversations_module.as_read(*conversations),
+            frozenset({conversations[1].source_id}),
         )
 
 
@@ -42,7 +45,7 @@ class _BrokenSanitizer(SecretSanitizerContract):
     def secret_sample(self):
         from hermes_memory.sanitization import RedactionCategory
 
-        return conversations.FAKE_SECRET, RedactionCategory.PASSWORD
+        return conversations_module.FAKE_SECRET, RedactionCategory.PASSWORD
 
 
 class _BrokenClassifier(ProjectClassifierContract):

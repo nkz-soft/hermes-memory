@@ -7,7 +7,12 @@ Two of the six boundaries of ARCHITECTURE.md §8 are declared here; their implem
 with #10 (ChatGPT) and #14 (SQLite import state).
 """
 
-from hermes_memory.ingestion.source import ConversationSource, SourceFormatError, SourceUnavailable
+from hermes_memory.ingestion.source import (
+    ConversationSource,
+    SourceConversation,
+    SourceFormatError,
+    SourceUnavailable,
+)
 from hermes_memory.ingestion.state import (
     ImportRecord,
     ImportState,
@@ -24,6 +29,7 @@ __all__ = [
     "ImportStateCorrupt",
     "ImportStateUnavailable",
     "ImportStatus",
+    "SourceConversation",
     "SourceFormatError",
     "SourceUnavailable",
     "may_skip",

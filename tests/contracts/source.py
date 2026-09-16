@@ -3,8 +3,10 @@
 Rules CS-1 to CS-7 of specs/007-boundary-interfaces/contracts/contract-suites.md.
 
 An implementation is run against this by subclassing it and supplying itself through
-`make_source`. The three optional hooks describe failures; an implementation that cannot be made to
-fail that way returns `None` and the rule is skipped rather than asserted falsely.
+`make_source`, which is handed plain conversations and returns a source that yields them paired
+with whatever bytes that implementation reads them from. The three optional hooks describe
+failures; an implementation that cannot be made to fail that way returns `None` and the rule is
+skipped rather than asserted falsely.
 """
 
 from __future__ import annotations
@@ -13,8 +15,14 @@ from collections.abc import Iterator
 
 import pytest
 
+from hermes_memory.archive import OriginalPayload
 from hermes_memory.errors import BoundaryError
-from hermes_memory.ingestion import ConversationSource, SourceFormatError, SourceUnavailable
+from hermes_memory.ingestion import (
+    ConversationSource,
+    SourceConversation,
+    SourceFormatError,
+    SourceUnavailable,
+)
 from hermes_memory.normalization import Conversation
 from tests.contracts import conversations
 
@@ -40,16 +48,18 @@ class ConversationSourceContract:
 
     # --- the contract ---------------------------------------------------------------------------
 
-    def test_cs1_every_conversation_carries_the_declared_source(self) -> None:
-        source = self.make_source(
-            (conversations.conversation("a"), conversations.conversation("b"))
-        )
+    def test_cs1_every_conversation_carries_the_declared_source_and_its_original(self) -> None:
+        """Both forms: Principle I asks the archive for both, and only the source has the bytes."""
+        pair = (conversations.conversation("a"), conversations.conversation("b"))
+        source = self.make_source(pair)
 
         read = tuple(source.read())
 
         assert len(read) == 2
-        assert all(isinstance(one, Conversation) for one in read)
-        assert all(one.source == source.source for one in read)
+        assert all(isinstance(one, SourceConversation) for one in read)
+        assert all(isinstance(one.conversation, Conversation) for one in read)
+        assert all(one.conversation.source == source.source for one in read)
+        assert all(isinstance(one.original, OriginalPayload) for one in read)
 
     def test_cs2_reading_yields_one_conversation_at_a_time(self) -> None:
         """An iterator: a year of history is not held in memory to sanitize one item of it."""
@@ -79,7 +89,7 @@ class ConversationSourceContract:
         if source is None:
             pytest.skip("this implementation cannot be made to fail on a single conversation")
 
-        read: list[Conversation] = []
+        read: list[SourceConversation] = []
         failures: list[SourceFormatError] = []
         iterator = source.read()
         while True:
@@ -91,7 +101,7 @@ class ConversationSourceContract:
                 failures.append(failure)
 
         assert len(failures) == 1
-        assert [one.source_id for one in read] == ["a", "c"]
+        assert [one.conversation.source_id for one in read] == ["a", "c"]
 
     def test_cs6_an_unreachable_export_is_a_retryable_failure(self) -> None:
         source = self.make_unreachable_source()

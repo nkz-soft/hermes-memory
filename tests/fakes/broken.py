@@ -16,7 +16,12 @@ from collections.abc import Iterator
 from hermes_memory.archive import ArchiveDocumentNotFound, OriginalPayload
 from hermes_memory.classification import ProjectClassifier
 from hermes_memory.errors import PermanentBoundaryError
-from hermes_memory.ingestion import ImportRecord, ImportStatus, SourceFormatError
+from hermes_memory.ingestion import (
+    ImportRecord,
+    ImportStatus,
+    SourceConversation,
+    SourceFormatError,
+)
 from hermes_memory.memory.interface import RecallResult
 from hermes_memory.normalization import (
     AnyTag,
@@ -34,16 +39,18 @@ class SourceThatStopsAtTheFirstBadConversation:
     The most likely way to write this boundary, and the reason CS-5 is a rule.
     """
 
-    def __init__(self, conversations: tuple[Conversation, ...], unreadable: frozenset[str]) -> None:
+    def __init__(
+        self, conversations: tuple[SourceConversation, ...], unreadable: frozenset[str]
+    ) -> None:
         self.source = Source.CHATGPT
         self._conversations = conversations
         self._unreadable = unreadable
 
-    def read(self) -> Iterator[Conversation]:
-        for conversation in self._conversations:
-            if conversation.source_id in self._unreadable:
-                raise SourceFormatError("unparsable", subject=conversation.source_id)
-            yield conversation
+    def read(self) -> Iterator[SourceConversation]:
+        for read in self._conversations:
+            if read.conversation.source_id in self._unreadable:
+                raise SourceFormatError("unparsable", subject=read.conversation.source_id)
+            yield read
 
 
 class SanitizerThatReportsWhatItDidNotDo:

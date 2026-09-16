@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from hermes_memory.archive import OriginalPayload
+from hermes_memory.ingestion import SourceConversation
 from hermes_memory.normalization import (
     Conversation,
     EnrichedConversation,
@@ -121,3 +123,12 @@ def enrich(source: Conversation, *, project: str = "hermes-memory") -> EnrichedC
         ),
         tags=(SourceTag(value=source.source), ProjectTag(value=project)),
     )
+
+
+PAYLOAD = OriginalPayload(content=b'{"as": "exported"}', media_type="application/json")
+"""Stand-in for the bytes a conversation was parsed from. The archive keeps these (Principle I)."""
+
+
+def as_read(*of: Conversation) -> tuple[SourceConversation, ...]:
+    """Pair conversations with their originals, the way a source yields them."""
+    return tuple(SourceConversation(conversation=one, original=PAYLOAD) for one in of)

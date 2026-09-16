@@ -15,12 +15,38 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Protocol, runtime_checkable
 
+from hermes_memory.archive import OriginalPayload
 from hermes_memory.errors import PermanentBoundaryError, TransientBoundaryError
 from hermes_memory.normalization import Conversation, Source
+from hermes_memory.normalization.base import FrozenModel
 
-__all__ = ["ConversationSource", "SourceFormatError", "SourceUnavailable"]
+__all__ = [
+    "ConversationSource",
+    "SourceConversation",
+    "SourceFormatError",
+    "SourceUnavailable",
+]
 
 BOUNDARY = "conversation source"
+
+
+class SourceConversation(FrozenModel):
+    """One conversation as read, together with the bytes it was read from.
+
+    The pair exists because Principle I asks the archive for both forms and **only the source knows
+    the original**: by the time a conversation has been normalized, the JSON slice it came from is
+    gone unless somebody kept it. The alternative designs were worse — a second method on this
+    boundary would make every source retain or re-scan its export to answer it, and archiving the
+    normalized form alone would mean a replay faithfully reproducing the parser bug that prompted
+    the replay.
+
+    Discovered by composing the boundaries rather than by reading them: the pipeline harness of
+    #9 could not be written until the source and the archive agreed about this (US3 exists for
+    exactly that).
+    """
+
+    conversation: Conversation
+    original: OriginalPayload
 
 
 class SourceFormatError(PermanentBoundaryError):
@@ -60,8 +86,8 @@ class ConversationSource(Protocol):
     source: Source
     """Which source this reads. Every conversation it yields carries the same value (CS-1)."""
 
-    def read(self) -> Iterator[Conversation]:
-        """Yield the export's conversations, one at a time.
+    def read(self) -> Iterator[SourceConversation]:
+        """Yield the export's conversations, one at a time, each with the bytes it came from.
 
         An iterator rather than a sequence, and deliberately (CS-2): a caller processes and fails
         conversation by conversation (§18), and a year of ChatGPT history is not something to
