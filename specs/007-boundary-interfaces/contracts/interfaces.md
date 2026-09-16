@@ -17,18 +17,29 @@ synchronous (R17).
 > §8: read one source format, yield normalized conversations.
 
 ```python
+class SourceConversation(FrozenModel):
+    conversation: Conversation
+    original: OriginalPayload
+
+
 class ConversationSource(Protocol):
     source: Source
 
-    def read(self) -> Iterator[Conversation]: ...
+    def read(self) -> Iterator[SourceConversation]: ...
 ```
 
+* Yields each conversation **together with the bytes it was read from**. Principle I asks the
+  archive for both forms and only the source has the original — by the time a conversation is
+  normalized, the slice of the export it came from is gone unless somebody kept it. Added during
+  implementation: the pipeline harness (PL-1) could not be written until the source and the archive
+  agreed about this, which is the discovery US3 exists to make before either is real.
 * Yields one conversation at a time, so a caller can fail on one without abandoning the export or
   holding it in memory (FR-003, §18).
 * Every conversation it yields carries `source == self.source`.
 * An export with no conversations yields nothing. Emptiness is not an error (FR-017).
-* A conversation that cannot be read raises `SourceFormatError` from the iterator, and iteration may
-  be resumed for the remaining conversations; the export being unreachable raises
+* A conversation that cannot be read raises `SourceFormatError` from the iterator, and **the
+  iterator stays usable** for the remaining conversations — which rules out a generator, since an
+  exception raised inside one closes it for good (found while writing the fake); the export being unreachable raises
   `SourceUnavailable`.
 * Reading twice yields equal conversations: a source is a reader, not a cursor that consumes.
 

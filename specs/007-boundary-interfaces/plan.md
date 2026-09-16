@@ -193,7 +193,7 @@ specs/007-boundary-interfaces/
 src/hermes_memory/
 ├── errors.py                         # NEW — BoundaryError, Transient…, Permanent…
 ├── ingestion/
-│   ├── source.py                     # NEW — ConversationSource, SourceFormatError, SourceUnavailable
+│   ├── source.py                     # NEW — ConversationSource, SourceConversation, source errors
 │   └── state.py                      # NEW — ImportState, ImportRecord, ImportStatus, may_skip
 ├── sanitization/
 │   └── sanitizer.py                  # NEW — SecretSanitizer, RedactionReport, RedactionCategory
@@ -206,6 +206,7 @@ src/hermes_memory/
 
 tests/contracts/                      # NEW — the reusable suites (R11)
 ├── source.py, sanitizer.py, classifier.py, archive.py, store.py, state.py
+├── conversations.py                  # the synthesized conversations every suite builds on
 ├── test_fakes_pass_the_contracts.py  # the six fakes subclassed into the six suites
 └── test_suites_bite.py               # each suite held against a broken fake (FR-020)
 
@@ -213,10 +214,14 @@ tests/fakes/                          # NEW — in-memory implementations and th
 └── source.py, sanitizer.py, classifier.py, archive.py, store.py, state.py, broken.py
 
 tests/integration/                    # NEW
+├── conftest.py                       # the `no_io` guard (R14)
+├── pipeline.py                       # the harness — not #19's pipeline
 └── test_pipeline_from_fakes.py       # PL-1…PL-6, with network and filesystem blocked
 
 tests/unit/
 ├── test_errors.py                    # the taxonomy: retryability by type, what an error carries
+├── test_error_payloads.py            # what no declared error may carry (E5)
+├── test_boundary_values.py           # the types the boundaries own, validated on construction
 └── test_import_state_rules.py        # may_skip, the one domain rule this feature owns
 
 tests/structure/
@@ -280,6 +285,27 @@ Three things the design phase sharpened rather than left implied:
 3. **Principle IV's guard nearly deleted itself.** R15: filling `memory.interface` through the
    existing first-segment match would have exempted `memory/hindsight`. Narrowing by dotted prefix,
    with a test for the sibling case, is the difference between a guard and a green tick.
+
+## What implementation changed
+
+Four things the design did not foresee, each found by writing a test or a fake rather than by
+reading, and each recorded where it now lives:
+
+1. **A source yields the conversation with the bytes it came from** (`SourceConversation`). The
+   archive takes both forms (R8), and only the source holds the original. The pipeline harness could
+   not be written until the two agreed — which is what US3 was for. Recorded in
+   [interfaces.md §1](./contracts/interfaces.md) and [data-model.md](./data-model.md).
+2. **The source's iterator must survive a `SourceFormatError`**, which rules out a generator. Found
+   while writing the fake; CS-5 already required it, and the interface's documentation now says so
+   plainly because it is the obvious implementation. The broken fake for CS-5 is that generator.
+3. **A skip writes no import record.** §18's `skipped` is the run's report; recording it would
+   overwrite an `imported` record and re-import the conversation on the third run. Pinned by
+   `test_pl2_a_skip_does_not_overwrite_what_the_state_knew`, and #19 inherits it.
+4. **The layout guard filters per file, not per walk root.** A recorded parent (`memory`) rglobs
+   into its recorded children, so the dotted-prefix match of R15 alone still reported the filled
+   `memory/interface`. The sibling test caught it.
+
+None changes a principle, and the constitution re-check above still holds.
 
 ## Complexity Tracking
 

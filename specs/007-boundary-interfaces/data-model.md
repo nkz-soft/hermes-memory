@@ -6,7 +6,8 @@
 #8 defined the conversation, the message, tool activity, provenance, the enriched conversation and
 the tags, and SC-001 of that feature reserved exactly this space: a boundary may own a type the
 model deliberately does not define, as long as it does not invent a second way to describe a
-conversation. Six such types are defined here, and nothing else.
+conversation. Seven such types are defined here — six planned, and `SourceConversation`, which implementation
+showed was missing — and nothing else.
 
 Every value is a `FrozenModel` from `hermes_memory.normalization.base` — immutable, extra fields
 forbidden, validated on construction — except the errors, which are exceptions (R16, R4).
@@ -24,6 +25,17 @@ parser over the original bytes (Principle I, §14, R8).
 | `media_type` | `Text` | yes | non-empty, e.g. `application/json` |
 
 The archive does not interpret either field. The on-disk layout is #13's (§20).
+
+## `SourceConversation` — `ingestion/source.py`
+
+One conversation as a source reads it, with the bytes it came from. Added during implementation,
+when composing the boundaries showed the archive needs an original that only the source holds
+([interfaces.md §1](./contracts/interfaces.md#1-conversationsource--ingestionsourcepy)).
+
+| Field | Type | Required | Rule |
+|---|---|---|---|
+| `conversation` | `Conversation` | yes | #8's normalized conversation |
+| `original` | `OriginalPayload` | yes | the bytes it was parsed from |
 
 ## `RedactionReport` and `RedactionCategory` — `sanitization/sanitizer.py`
 

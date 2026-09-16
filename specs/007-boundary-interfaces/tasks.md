@@ -31,11 +31,11 @@ Single project: `src/hermes_memory/`, `tests/` at repository root, per
 **Purpose**: the three test packages this feature adds, so that later tasks import rather than
 create them.
 
-- [ ] T001 [P] Create `tests/contracts/__init__.py` with a docstring stating that the modules here
+- [x] T001 [P] Create `tests/contracts/__init__.py` with a docstring stating that the modules here
       belong to the boundary, not to any implementation (research R11)
-- [ ] T002 [P] Create `tests/fakes/__init__.py` with a docstring stating that nothing here ships in
+- [x] T002 [P] Create `tests/fakes/__init__.py` with a docstring stating that nothing here ships in
       `src/` and why (research R12, FR-027)
-- [ ] T003 [P] Create `tests/integration/__init__.py` with a docstring stating that it holds tests
+- [x] T003 [P] Create `tests/integration/__init__.py` with a docstring stating that it holds tests
       about several boundaries fitting together
 
 ---
@@ -49,19 +49,19 @@ otherwise rejects the first line of code placed in a recorded boundary.
 fails on any file with behaviour inside `ingestion/`, `sanitization/`, `classification/`, `archive/`
 or `memory/interface/`.
 
-- [ ] T004 Write `tests/unit/test_errors.py` first and observe it fail: `TransientBoundaryError.retryable`
+- [x] T004 Write `tests/unit/test_errors.py` first and observe it fail: `TransientBoundaryError.retryable`
       is `True` and `PermanentBoundaryError.retryable` is `False` (E2); `retryable` is a `ClassVar`
       that no constructor accepts and no instance can rebind (E3, FR-014); an error carries
       `boundary`, `subject` and `message` and nothing else (E4, FR-015); no error timestamps itself
       (E6)
-- [ ] T005 Create `src/hermes_memory/errors.py` with `BoundaryError`, `TransientBoundaryError` and
+- [x] T005 Create `src/hermes_memory/errors.py` with `BoundaryError`, `TransientBoundaryError` and
       `PermanentBoundaryError` per [data-model.md](./data-model.md#the-errors--errorspy-and-the-boundary-modules),
       making T004 pass (research R3, R4)
-- [ ] T006 Narrow the behaviour guard in `tests/structure/test_module_layout.py`: `FILLED_BOUNDARIES`
+- [x] T006 Narrow the behaviour guard in `tests/structure/test_module_layout.py`: `FILLED_BOUNDARIES`
       matches a recorded module by dotted prefix instead of first segment, and gains `ingestion`,
       `sanitization`, `classification`, `archive` and `memory.interface` — with the docstring
       recording which feature filled each, as the existing entries do (research R15)
-- [ ] T007 Add `test_the_behaviour_guard_still_bites_for_a_filled_siblings_neighbour` to
+- [x] T007 Add `test_filling_a_submodule_does_not_exempt_its_sibling` to
       `tests/structure/test_module_layout.py`: code placed in `memory/hindsight/` is still caught
       while `memory/interface/` is filled. Watch it fail against the first-segment version before
       T006 is in place (research R15)
@@ -82,41 +82,41 @@ declaration alone and have it type-check and run — which US2 then does six tim
 
 ### Types and declarations
 
-- [ ] T008 [P] [US1] Write `tests/unit/test_import_state_rules.py` first and observe it fail:
+- [x] T008 [P] [US1] Write `tests/unit/test_import_state_rules.py` first and observe it fail:
       `may_skip` is true only for an `imported` record whose `content_hash` matches, and false for
       `None`, for `failed`, for `skipped` and for a changed hash (IS-6, FR-012, research R10)
-- [ ] T009 [P] [US1] Write `tests/unit/test_boundary_values.py` first and observe it fail: the six
+- [x] T009 [P] [US1] Write `tests/unit/test_boundary_values.py` first and observe it fail: the six
       owned types validate on construction — `RedactionReport` counts are all ≥ 1 and a category
       with none redacted is absent rather than zero; `is_empty` and `total` behave; `ImportRecord.error`
       is present only for `failed`; `OriginalPayload.media_type` is non-empty; `RecallResult.score`
       is optional (data-model.md)
-- [ ] T010 [P] [US1] Create `src/hermes_memory/ingestion/source.py`: `ConversationSource` protocol
-      (`source: Source`, `read() -> Iterator[Conversation]`), `SourceFormatError` (permanent) and
+- [x] T010 [P] [US1] Create `src/hermes_memory/ingestion/source.py`: `ConversationSource` protocol
+      (`source: Source`, `read() -> Iterator[SourceConversation]`), `SourceFormatError` (permanent) and
       `SourceUnavailable` (transient), documented against §8 and §18
-- [ ] T011 [P] [US1] Create `src/hermes_memory/sanitization/sanitizer.py`: `SecretSanitizer`
+- [x] T011 [P] [US1] Create `src/hermes_memory/sanitization/sanitizer.py`: `SecretSanitizer`
       protocol (`sanitize(conversation) -> tuple[Conversation, RedactionReport]`), `RedactionReport`,
       `RedactionCategory` seeded with §13's minimum list — `api-key`, `bearer-token`, `jwt`,
       `github-token`, `gitlab-token`, `anthropic-key`, `openai-key`, `aws-access-key`,
       `private-key`, `password`, `connection-string`, `dotenv-value`, `kubernetes-secret` — and
       `SanitizationError` (permanent). The report carries counts only, never a value or an offset
       (research R6, Principle V)
-- [ ] T012 [P] [US1] Create `src/hermes_memory/classification/classifier.py`: `ProjectClassifier`
+- [x] T012 [P] [US1] Create `src/hermes_memory/classification/classifier.py`: `ProjectClassifier`
       protocol (`classify(conversation) -> ProjectTag`) and `UNKNOWN_PROJECT`. No error type is
       declared, and the docstring says why (E8, §15, research R7)
-- [ ] T013 [P] [US1] Create `src/hermes_memory/archive/interface.py`: `RawArchive` protocol
+- [x] T013 [P] [US1] Create `src/hermes_memory/archive/interface.py`: `RawArchive` protocol
       (`store(enriched, original)`, `load(document_id)`, `load_original(document_id)`),
       `OriginalPayload` (`content: bytes`, `media_type`), `ArchiveDocumentNotFound` and
       `ArchiveRejected` (permanent), `ArchiveUnavailable` (transient) (research R8, Principle I)
-- [ ] T014 [P] [US1] Create `src/hermes_memory/memory/interface/store.py`: `MemoryStore` protocol
+- [x] T014 [P] [US1] Create `src/hermes_memory/memory/interface/store.py`: `MemoryStore` protocol
       (`retain(enriched)`, `recall(query, tags=(), limit=None)`), `RecallResult`
       (`content`, `provenance`, `score: float | None`), `MemoryStoreRejected` (permanent) and
       `MemoryStoreUnavailable` (transient). No name in the module is a Hindsight term (FR-009,
       research R9)
-- [ ] T015 [P] [US1] Create `src/hermes_memory/ingestion/state.py`: `ImportState` protocol
+- [x] T015 [P] [US1] Create `src/hermes_memory/ingestion/state.py`: `ImportState` protocol
       (`record(record)`, `find(source, source_id) -> ImportRecord | None`), `ImportRecord`,
       `ImportStatus` (`imported`/`skipped`/`failed`), `may_skip`, `ImportStateCorrupt` (permanent)
       and `ImportStateUnavailable` (transient), making T008 pass (research R10)
-- [ ] T016 [US1] Export each boundary's public names from its module's `__init__.py`
+- [x] T016 [US1] Export each boundary's public names from its module's `__init__.py`
       (`ingestion`, `sanitization`, `classification`, `archive`, `memory/interface`) with `__all__`,
       keeping each docstring's statement of which §8 row it is
 
@@ -135,20 +135,20 @@ fake and watch it fail on exactly the rule named in the table.
 
 ### The suites (written before the fakes)
 
-- [ ] T017 [P] [US2] Write `tests/contracts/source.py` — `ConversationSourceContract` with one test
+- [x] T017 [P] [US2] Write `tests/contracts/source.py` — `ConversationSourceContract` with one test
       per rule CS-1…CS-7 and an abstract factory `make_source(conversations)`, plus optional hooks
       for the unreadable-conversation and unreachable-export cases
-- [ ] T018 [P] [US2] Write `tests/contracts/sanitizer.py` — `SecretSanitizerContract`, rules
+- [x] T018 [P] [US2] Write `tests/contracts/sanitizer.py` — `SecretSanitizerContract`, rules
       SS-1…SS-8, factory `make_sanitizer()`
-- [ ] T019 [P] [US2] Write `tests/contracts/classifier.py` — `ProjectClassifierContract`, rules
+- [x] T019 [P] [US2] Write `tests/contracts/classifier.py` — `ProjectClassifierContract`, rules
       PC-1…PC-5, factory `make_classifier()`
-- [ ] T020 [P] [US2] Write `tests/contracts/archive.py` — `RawArchiveContract`, rules RA-1…RA-9,
+- [x] T020 [P] [US2] Write `tests/contracts/archive.py` — `RawArchiveContract`, rules RA-1…RA-9,
       factory `make_archive()`
-- [ ] T021 [P] [US2] Write `tests/contracts/store.py` — `MemoryStoreContract`, rules MS-1…MS-11,
+- [x] T021 [P] [US2] Write `tests/contracts/store.py` — `MemoryStoreContract`, rules MS-1…MS-11,
       factory `make_store()`
-- [ ] T022 [P] [US2] Write `tests/contracts/state.py` — `ImportStateContract`, rules IS-1…IS-8,
+- [x] T022 [P] [US2] Write `tests/contracts/state.py` — `ImportStateContract`, rules IS-1…IS-8,
       factory `make_state()`
-- [ ] T023 [US2] Add `tests/contracts/conversations.py`: the synthesized conversations every suite
+- [x] T023 [US2] Add `tests/contracts/conversations.py`: the synthesized conversations every suite
       builds on — one minimal, one exercising every optional field of #8's model, one carrying a
       recognizable fake secret. Never real history (CLAUDE.md)
 
@@ -158,30 +158,30 @@ fake and watch it fail on exactly the rule named in the table.
 
 ### The fakes
 
-- [ ] T024 [P] [US2] `tests/fakes/source.py` — `InMemoryConversationSource` over a tuple, with a
+- [x] T024 [P] [US2] `tests/fakes/source.py` — `InMemoryConversationSource` over a tuple, with a
       constructor option that makes one conversation unreadable (CS-5) and one that makes the export
       unreachable (CS-6)
-- [ ] T025 [P] [US2] `tests/fakes/sanitizer.py` — `InMemorySecretSanitizer` replacing one known
+- [x] T025 [P] [US2] `tests/fakes/sanitizer.py` — `InMemorySecretSanitizer` replacing one known
       marker with `[REDACTED]` and reporting it under a §13 category, preserving surrounding text
-- [ ] T026 [P] [US2] `tests/fakes/classifier.py` — `InMemoryProjectClassifier` over an alias map,
+- [x] T026 [P] [US2] `tests/fakes/classifier.py` — `InMemoryProjectClassifier` over an alias map,
       returning `UNKNOWN_PROJECT` for anything unmapped
-- [ ] T027 [P] [US2] `tests/fakes/archive.py` — `InMemoryRawArchive` keyed by document id, holding
+- [x] T027 [P] [US2] `tests/fakes/archive.py` — `InMemoryRawArchive` keyed by document id, holding
       both forms, idempotent on re-store, with switches for the unavailable and rejected cases
-- [ ] T028 [P] [US2] `tests/fakes/store.py` — `InMemoryMemoryStore` with substring recall, tag
+- [x] T028 [P] [US2] `tests/fakes/store.py` — `InMemoryMemoryStore` with substring recall, tag
       narrowing, `limit`, replace-on-retain, and switches for the rejected and unavailable cases
-- [ ] T029 [P] [US2] `tests/fakes/state.py` — `InMemoryImportState` keyed by `(source, source_id)`,
+- [x] T029 [P] [US2] `tests/fakes/state.py` — `InMemoryImportState` keyed by `(source, source_id)`,
       last write wins, recording failures
-- [ ] T030 [US2] `tests/contracts/test_fakes_pass_the_contracts.py` — six subclasses binding each
+- [x] T030 [US2] `tests/contracts/test_fakes_pass_the_contracts.py` — six subclasses binding each
       fake to its suite; all six pass (SC-002)
 
 ### The suites are watched failing
 
-- [ ] T031 [P] [US2] `tests/fakes/broken.py` — six deliberately broken implementations, each
+- [x] T031 [P] [US2] `tests/fakes/broken.py` — six deliberately broken implementations, each
       violating exactly one rule: a source that stops at the first unreadable conversation (CS-5), a
       sanitizer reporting a redaction it did not make (SS-3), a classifier that raises instead of
       answering `project:unknown` (PC-2), an archive that drops message timestamps (RA-1), a store
       that appends on re-retain (MS-2), an import state that records only successes (IS-4)
-- [ ] T032 [US2] `tests/contracts/test_suites_bite.py` — one test per boundary, calling the rule's
+- [x] T032 [US2] `tests/contracts/test_suites_bite.py` — one test per boundary, calling the rule's
       contract method directly inside `pytest.raises(AssertionError)`, asserting the suite rejects
       the breakage (FR-020, SC-003, research R13)
 
@@ -197,19 +197,19 @@ filesystem blocked.
 
 **Independent Test**: run the harness and read the four assertions PL-1…PL-3 and PL-5.
 
-- [ ] T033 [US3] Add the I/O guard fixture to `tests/integration/conftest.py`: monkeypatch
+- [x] T033 [US3] Add the I/O guard fixture to `tests/integration/conftest.py`: monkeypatch
       `socket.socket`, `builtins.open`, `pathlib.Path.open`, `Path.write_text` and
       `Path.write_bytes` to raise, and document what it does not cover — `os.open`, C extensions
       (research R14)
-- [ ] T034 [US3] Write `tests/integration/test_pipeline_from_fakes.py` first and observe it fail:
+- [x] T034 [US3] Write `tests/integration/test_pipeline_from_fakes.py` first and observe it fail:
       PL-1 — one synthesized conversation is sanitized, classified, enriched, archived, retained and
       recorded
-- [ ] T035 [US3] Extend it with PL-2 and PL-3: a second run over unchanged content reaches neither
+- [x] T035 [US3] Extend it with PL-2 and PL-3: a second run over unchanged content reaches neither
       archive nor store and the import state is what decided it; changed content reaches both under
       the same `document_id` (§17, §10, SC-005)
-- [ ] T036 [US3] Extend it with PL-5: the whole run performs no network call and no filesystem
+- [x] T036 [US3] Extend it with PL-5: the whole run performs no network call and no filesystem
       write, blocked rather than unobserved (SC-004)
-- [ ] T037 [US3] Implement the harness the tests compose — the smallest arrangement of the six
+- [x] T037 [US3] Implement the harness the tests compose — the smallest arrangement of the six
       boundaries in §7's order, living in the test module. It is not #19's pipeline and the
       docstring says so (FR-027)
 
@@ -226,15 +226,15 @@ classifiable and survivable.
 **Independent Test**: make one conversation fail transiently and another permanently, and watch the
 run classify both, continue, and report them with their source ids.
 
-- [ ] T038 [US4] Extend `tests/integration/test_pipeline_from_fakes.py` with PL-4: a conversation
+- [x] T038 [US4] Extend `tests/integration/test_pipeline_from_fakes.py` with PL-4: a conversation
       failing one stage does not stop the run, the others are imported, and the failure is reported
       with its source id (§18)
-- [ ] T039 [US4] Record the failure in the import state as `failed` in that test, and assert a
+- [x] T039 [US4] Record the failure in the import state as `failed` in that test, and assert a
       `failed` record is distinguishable from no record on the next run (IS-4, research R10)
-- [ ] T040 [P] [US4] Add `tests/unit/test_error_payloads.py`: no declared error carries conversation
+- [x] T040 [P] [US4] Add `tests/unit/test_error_payloads.py`: no declared error carries conversation
       content, a credential, a token or an authorization header, and the memory store's errors
       document the chained cause as unsafe to render (E5, FR-016, §19)
-- [ ] T041 [P] [US4] Add to `tests/structure/test_boundary_interfaces.py` the assertion that every
+- [x] T041 [P] [US4] Add to `tests/structure/test_boundary_interfaces.py` the assertion that every
       error type declared by a boundary module derives from `TransientBoundaryError` or
       `PermanentBoundaryError` — a new error cannot be added outside the taxonomy (E1, E2)
 
@@ -248,19 +248,19 @@ run classify both, continue, and report them with their source ids.
 
 **Independent Test**: swap the store fake and rerun the pipeline tests unchanged.
 
-- [ ] T042 [US5] Add a second, differently-implemented memory store fake to `tests/fakes/store.py`
+- [x] T042 [US5] Add a second, differently-implemented memory store fake to `tests/fakes/store.py`
       (for example one that indexes by tag rather than scanning), and bind it to
       `MemoryStoreContract` in `tests/contracts/test_fakes_pass_the_contracts.py`
-- [ ] T043 [US5] Add PL-6 to `tests/integration/test_pipeline_from_fakes.py`: the pipeline
+- [x] T043 [US5] Add PL-6 to `tests/integration/test_pipeline_from_fakes.py`: the pipeline
       parametrized over both stores, with only the composition line differing (SC-006)
-- [ ] T044 [US5] Write `tests/structure/test_boundary_interfaces.py` first and observe it fail: no
+- [x] T044 [US5] Write `tests/structure/test_boundary_interfaces.py` first and observe it fail: no
       interface module's transitive import graph reaches Hindsight, an HTTP client or a storage
       library, following the guard `tests/structure/test_normalization_boundary.py` already
       establishes (FR-026, SC-007)
-- [ ] T045 [US5] Add the vocabulary assertion to the same file: no public name in any of the six
+- [x] T045 [US5] Add the vocabulary assertion to the same file: no public name in any of the six
       interface modules is a Hindsight term — bank, item, retain mission, update mode, operation id,
       endpoint (FR-009, MS-10)
-- [ ] T046 [US5] Prove that guard bites: a test that adds a forbidden import and a Hindsight-named
+- [x] T046 [US5] Prove that guard bites: a test that adds a forbidden import and a Hindsight-named
       public symbol to a synthesized module and observes both assertions fail (the repository's
       `test_the_behaviour_guard_still_bites` convention)
 
@@ -270,13 +270,13 @@ run classify both, continue, and report them with their source ids.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T047 [P] Check every rule id of [contracts/contract-suites.md](./contracts/contract-suites.md)
+- [x] T047 [P] Check every rule id of [contracts/contract-suites.md](./contracts/contract-suites.md)
       has exactly one test, and every test names its rule id — add the missing ones rather than
       editing the contract
-- [ ] T048 [P] Run `uv run ruff check .` and `uv run ruff format --check .` and fix what they report
-- [ ] T049 Walk [quickstart.md](./quickstart.md) end to end as a reviewer would, running each
+- [x] T048 [P] Run `uv run ruff check .` and `uv run ruff format --check .` and fix what they report
+- [x] T049 Walk [quickstart.md](./quickstart.md) end to end as a reviewer would, running each
       command and confirming its stated outcome; correct the quickstart where reality differs
-- [ ] T050 Re-read [plan.md](./plan.md#constitution-check) against the finished branch and confirm
+- [x] T050 Re-read [plan.md](./plan.md#constitution-check) against the finished branch and confirm
       each principle's claim is still true of the code, amending the plan if the design moved
 
 ---

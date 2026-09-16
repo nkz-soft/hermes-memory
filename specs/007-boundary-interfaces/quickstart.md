@@ -24,7 +24,7 @@ The branch point was `677 passed`; this feature adds to that and removes nothing
 ## 2. The six contract suites pass against the six fakes (SC-002)
 
 ```bash
-uv run pytest tests/contracts tests/fakes -q
+uv run pytest tests/contracts -q
 ```
 
 Every fake is an in-memory implementation that performs no I/O, and each is run against the suite
@@ -81,7 +81,7 @@ Two checks matter here:
 Then confirm the guard bites, the same way #8's does:
 
 ```bash
-uv run pytest tests/structure/test_module_layout.py -k bites -v
+uv run pytest tests/structure/test_module_layout.py -k "bites or sibling" -v
 ```
 
 This feature fills five boundaries, and narrowing `FILLED_BOUNDARIES` by dotted prefix is what keeps

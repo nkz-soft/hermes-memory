@@ -27,7 +27,7 @@ Every rule below has an id, and every id has exactly one test.
 
 | Id | Rule |
 |---|---|
-| CS-1 | Every yielded value is a `Conversation`, and its `source` equals the source's declared `source`. |
+| CS-1 | Every yielded value is a `SourceConversation` carrying an `OriginalPayload`, and its conversation's `source` equals the source's declared `source`. |
 | CS-2 | Reading yields conversations one at a time — the return value is an iterator, not a materialized sequence. |
 | CS-3 | An empty export yields nothing and raises nothing. |
 | CS-4 | Reading twice yields equal conversations. |
@@ -112,7 +112,7 @@ suite catches that rule and names it:
 |---|---|---|
 | Conversation source | stops iterating at the first unreadable conversation | CS-5 |
 | Secret sanitizer | reports a redaction it did not perform | SS-3 |
-| Project classifier | raises instead of answering `project:unknown` | PC-2 |
+| Project classifier | raises instead of answering `project:unknown` | PC-2 (raises through) and PC-5 (reports it) |
 | Raw archive | drops the message timestamps on store | RA-1 |
 | Memory store | appends on re-retain instead of replacing | MS-2 |
 | Import state | records only successes | IS-4 |
