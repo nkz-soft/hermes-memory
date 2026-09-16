@@ -75,6 +75,10 @@ class TestInMemoryRawArchive(RawArchiveContract):
     def make_rejecting_archive(self) -> RawArchive | None:
         return InMemoryRawArchive(rejects=True)
 
+    def reopen(self, archive: RawArchive) -> RawArchive | None:
+        assert isinstance(archive, InMemoryRawArchive)
+        return archive.reopened()
+
 
 class TestInMemoryMemoryStore(MemoryStoreContract):
     def make_store(self) -> MemoryStore:
@@ -103,3 +107,7 @@ class TestInMemoryImportState(ImportStateContract):
 
     def make_corrupt_state(self) -> ImportState | None:
         return InMemoryImportState(corrupt=True)
+
+    def reopen(self, state: ImportState) -> ImportState | None:
+        assert isinstance(state, InMemoryImportState)
+        return state.reopened()

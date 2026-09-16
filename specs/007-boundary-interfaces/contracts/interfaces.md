@@ -97,6 +97,8 @@ class RawArchive(Protocol):
 * Round-trips: what `load` returns equals what was stored, with an equal content hash. A field
   quietly dropped is the failure Principle I is written against.
 * Idempotent by document id: storing twice leaves one document, and the second store wins.
+* `archive/__init__.py` re-exports the interface and no implementation: the source interface names
+  `OriginalPayload`, so every consumer of it initializes this package.
 * `load` and `load_original` for a document the archive does not hold raise
   `ArchiveDocumentNotFound`; a store that cannot be reached raises `ArchiveUnavailable`; input the
   archive refuses raises `ArchiveRejected` (FR-007).
@@ -153,7 +155,8 @@ def may_skip(record: ImportRecord | None, content_hash: str) -> bool: ...
 * `find` for a conversation never seen returns `None` — the state of everything on the first run
   (FR-017).
 * `record` is last-write-wins per `(source, source_id)`: a conversation imported, then re-imported
-  after a change, has one current record.
+  after a change, has one current record. That is why **a skip is never recorded** — `ImportRecord`
+  refuses one — and why the stored hash is of the conversation as read, not as sanitized.
 * Outcomes include failures (§18, R10). A `failed` record and no record are different answers, and a
   resume depends on the difference.
 * The skip decision is `may_skip`, not a method: one rule for every store, so two implementations

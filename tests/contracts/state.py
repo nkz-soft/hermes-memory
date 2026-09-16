@@ -64,6 +64,10 @@ class ImportStateContract:
         """Return a state store whose contents cannot be read as state, or `None`."""
         return None
 
+    def reopen(self, state: ImportState) -> ImportState | None:
+        """Return a *new* store over the same storage as this one, or `None` (see IS-9)."""
+        return None
+
     # --- the contract ---------------------------------------------------------------------------
 
     def test_is1_a_conversation_never_recorded_is_unknown(self) -> None:
@@ -151,3 +155,19 @@ class ImportStateContract:
                 pass
             except Exception as leaked:
                 pytest.fail(f"a non-boundary exception crossed the boundary: {leaked!r}")
+
+    def test_is9_what_was_recorded_survives_reopening_the_store(self) -> None:
+        """§17 — the skip exists to survive a restart; a state forgetting on exit skips nothing."""
+        state = self.make_state()
+        state.record(record(ImportStatus.IMPORTED))
+        state.record(record(ImportStatus.FAILED, source_id="broken1"))
+
+        reopened = self.reopen(state)
+        if reopened is None:
+            pytest.skip("this implementation cannot be reopened over the same storage")
+        assert reopened is not state, "reopen must return a new instance, not the same object"
+
+        assert reopened.find(Source.CHATGPT, "abc123") == record(ImportStatus.IMPORTED)
+        found = reopened.find(Source.CHATGPT, "broken1")
+        assert found is not None
+        assert found.status is ImportStatus.FAILED

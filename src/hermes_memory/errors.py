@@ -79,6 +79,34 @@ class BoundaryError(Exception):
             )
         super().__setattr__(name, value)
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Refuse a subclass that redeclares the branch it inherits (E3, FR-014).
+
+        Without this, a subclass of `PermanentBoundaryError` could set `retryable = True` and be
+        caught as permanent by a reporter while being retried as transient by #20 — two answers to
+        the one question the taxonomy exists to answer once.
+
+        Read from the MRO rather than by naming the two branches, because this runs while those
+        branches are themselves being created. `BoundaryError` declares the attribute without a
+        value, so the first class to give it one is a branch, and every class below may only agree.
+        """
+        super().__init_subclass__(**kwargs)
+        declared = cls.__dict__.get("retryable")
+        inherited = next(
+            (
+                base.__dict__["retryable"]
+                for base in cls.__mro__[1:]
+                if "retryable" in base.__dict__
+            ),
+            None,
+        )
+        if declared is not None and inherited is not None and declared is not inherited:
+            raise TypeError(
+                f"{cls.__name__} redeclares retryable as {declared} under a branch that says "
+                f"{inherited}; retryability is the branch, so derive from the other one "
+                "(contracts/errors.md, E3)"
+            )
+
 
 class TransientBoundaryError(BoundaryError):
     """The identical call could succeed if repeated.

@@ -56,6 +56,13 @@ class ImportRecord(FrozenModel):
     source: Source
     source_id: OpaqueIdentifier
     content_hash: Text = Field(min_length=1)
+    """#8's content hash of the conversation **as read** — before sanitization.
+
+    The skip compares it against the hash of what the source yields next time, which is the raw
+    conversation. The hash of the redacted form would never match once anything was redacted, so
+    every conversation that ever carried a secret would be re-extracted on every run; and a change
+    to #11's redaction rules would look like a change of content.
+    """
     document_id: Text = Field(min_length=1)
     recorded_at: Timestamp
     """When the importer wrote this record.
@@ -68,8 +75,25 @@ class ImportRecord(FrozenModel):
     """Why it failed, for §18's report. Carries no conversation content and no credential (E5)."""
 
     @model_validator(mode="after")
-    def _only_a_failure_explains_itself(self) -> ImportRecord:
-        """An imported conversation carrying an error is a record nobody can act on."""
+    def _a_skip_is_reported_never_remembered(self) -> ImportRecord:
+        """`skipped` is §18's word for the run's report, and never a state to store.
+
+        Last write wins (IS-3): a stored skip would overwrite the `imported` record it was decided
+        from, `may_skip` would then answer no, and the conversation would be re-extracted on every
+        other run, forever. Refused here so that no store and no pipeline has to remember not to.
+        """
+        if self.status is ImportStatus.SKIPPED:
+            raise ValueError(
+                "a skip is reported by the run, never recorded in the import state: recording it "
+                "would overwrite the imported record the skip was decided from"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _only_a_failure_explains_itself_and_it_must(self) -> ImportRecord:
+        """A failure without its error reports nothing (§18); a success with one is unactionable."""
+        if self.status is ImportStatus.FAILED and not self.error:
+            raise ValueError("a failed record must carry the error that §18 reports")
         if self.error is not None and self.status is not ImportStatus.FAILED:
             raise ValueError(
                 f"only a failed record carries an error, got status {self.status} with "
@@ -88,8 +112,11 @@ def may_skip(record: ImportRecord | None, content_hash: str) -> bool:
     rule is here, once.
 
     True only for a conversation we imported, whose content has not moved since. `None` is the first
-    run; a failed record is work to retry (§18); a skipped one records that we did nothing, and
-    reading it as success would strand the conversation forever.
+    run, and a failed record is work to retry (§18). A skipped record cannot exist — see
+    `ImportRecord` — which is what keeps this answer stable across any number of runs.
+
+    `content_hash` is the hash of the conversation as the source yields it, unsanitized, to match
+    what `ImportRecord.content_hash` holds.
     """
     if record is None:
         return False
@@ -118,7 +145,8 @@ class ImportState(Protocol):
         """Remember the outcome of one conversation's import.
 
         Last write wins per `(source, source_id)` (IS-3): a conversation imported, then re-imported
-        after a change, has one current record.
+        after a change, has one current record. That is why a skip is never recorded, and why
+        `ImportRecord` refuses to represent one.
 
         Failures are recorded, not omitted (IS-4, §18). "No record" and "a record saying it failed"
         are different answers, and a resume that cannot tell them apart cannot tell a conversation

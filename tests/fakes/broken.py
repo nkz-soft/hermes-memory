@@ -14,7 +14,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from hermes_memory.archive import ArchiveDocumentNotFound, OriginalPayload
-from hermes_memory.classification import ProjectClassifier
 from hermes_memory.errors import PermanentBoundaryError
 from hermes_memory.ingestion import (
     ImportRecord,
@@ -160,6 +159,3 @@ class StateThatRemembersOnlySuccesses:
 
     def find(self, source: Source, source_id: str) -> ImportRecord | None:
         return self._records.get((source, source_id))
-
-
-BROKEN_CLASSIFIER: ProjectClassifier = ClassifierThatRaisesInsteadOfAnsweringUnknown()

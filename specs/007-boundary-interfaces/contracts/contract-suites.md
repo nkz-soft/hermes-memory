@@ -21,6 +21,11 @@ a lie.
 
 Every rule below has an id, and every id has exactly one test.
 
+**Written for #16, not only for the fakes.** The memory store rules never compare result counts across
+calls — LLM extraction yields a varying number of facts per document — and never expect an arbitrary
+query to find nothing, because vector recall returns nearest neighbours. Revised after review found the
+first version unimplementable for a semantic engine.
+
 ---
 
 ## `ConversationSourceContract`
@@ -41,7 +46,7 @@ Every rule below has an id, and every id has exactly one test.
 |---|---|
 | SS-1 | The input conversation is unchanged after the call. |
 | SS-2 | The returned conversation preserves `source`, `source_id`, `document_id`, message count and message order. |
-| SS-3 | A conversation carrying a known secret returns with that value absent from every message. |
+| SS-3 | A conversation carrying a known secret — in its title, message text, tool requests and results, and attachment names — returns with the value absent from its entire serialized form. |
 | SS-4 | The surrounding text survives: a message that was non-empty is non-empty afterwards, and no message is dropped (§13). |
 | SS-5 | The report counts what was redacted, by §13 category. |
 | SS-6 | Nothing to redact returns an empty report, not `None`, and the conversation unchanged. |
@@ -64,29 +69,29 @@ Every rule below has an id, and every id has exactly one test.
 |---|---|
 | RA-1 | A stored enriched conversation loads back equal, with an equal content hash. |
 | RA-2 | The original payload loads back byte-identical, with its media type. |
-| RA-3 | Storing the same document id twice leaves one document, and the second store wins. |
+| RA-3 | Storing the same document id twice leaves one document, and the second store wins — for the normalized form and the original alike. |
 | RA-4 | `load` for an unknown document id raises `ArchiveDocumentNotFound`, which is not retryable. |
 | RA-5 | `load_original` for an unknown document id raises `ArchiveDocumentNotFound`. |
 | RA-6 | A conversation exercising every optional field of #8's model round-trips unchanged. |
 | RA-7 | An unavailable store raises `ArchiveUnavailable`, which is retryable; refused input raises `ArchiveRejected`, which is not. |
 | RA-8 | No exception belonging to a library crosses the boundary (E1). |
-| RA-9 | After `store` returns, the document is loadable — no deferred write the caller cannot see (Principle I). |
+| RA-9 | A stored document survives reopening the archive over the same storage, through the optional `reopen` hook (Principle I). Skipped where an implementation cannot be reopened. |
 
 ## `MemoryStoreContract`
 
 | Id | Rule |
 |---|---|
 | MS-1 | A retained conversation is recallable by a query matching its content. |
-| MS-2 | Retaining the same enriched conversation twice yields no duplicate in recall results (FR-010). |
-| MS-3 | Re-retaining a changed conversation under the same document id replaces rather than adds. |
-| MS-4 | `recall` matching nothing returns an empty tuple. |
+| MS-2 | Retaining the same enriched conversation twice yields no duplicate: no content appears twice for the same document within one result set (FR-010). |
+| MS-3 | Re-retaining a changed conversation under the same document id replaces rather than adds: the new content is recallable and no result still carries the old. |
+| MS-4 | `recall` against a store holding nothing returns an empty tuple. |
 | MS-5 | Results carry the provenance the item was retained with. |
 | MS-6 | `tags` narrow results: an item whose tags do not include the requested ones is not returned. |
-| MS-7 | `limit` bounds the number of results. |
-| MS-8 | A rejected, unauthorized or invalid call raises `MemoryStoreRejected`, which is not retryable. |
-| MS-9 | A timeout, reset or 429/502/503/504 raises `MemoryStoreUnavailable`, which is retryable (§18). |
+| MS-7 | `limit` bounds the number of results, and a store holding matches still returns at least one. |
+| MS-8 | A rejected, unauthorized or invalid call — `retain` or `recall` — raises `MemoryStoreRejected`, which is not retryable. |
+| MS-9 | A timeout, reset or 429/502/503/504 on `retain` or `recall` raises `MemoryStoreUnavailable`, which is retryable (§18). |
 | MS-10 | No exception belonging to a library crosses the boundary, and no public name in the interface is a Hindsight term (FR-009). |
-| MS-11 | A conversation large enough to be delivered in parts is recalled as one document; the caller cannot observe the split (§9). |
+| MS-11 | A conversation large enough to be delivered in parts is recalled as one document with no content duplicated by a second retain; the caller cannot observe the split (§9). |
 
 ## `ImportStateContract`
 
@@ -97,9 +102,10 @@ Every rule below has an id, and every id has exactly one test.
 | IS-3 | Recording the same `(source, source_id)` twice leaves the later record. |
 | IS-4 | A `failed` record is retrievable and distinguishable from no record (§18). |
 | IS-5 | Records for different sources with the same native id do not collide. |
-| IS-6 | `may_skip` is true only for an `imported` record whose content hash matches; false for `None`, for `failed`, for `skipped`, and for a changed hash. |
+| IS-6 | `may_skip` is true only for an `imported` record whose content hash matches; false for `None`, for `failed`, and for a changed hash. |
 | IS-7 | An unavailable store raises `ImportStateUnavailable`, which is retryable; unreadable state raises `ImportStateCorrupt`, which is not. |
 | IS-8 | No exception belonging to a library crosses the boundary (E1). |
+| IS-9 | What was recorded, failures included, survives reopening the store over the same storage, through the optional `reopen` hook (§17). Skipped where an implementation cannot be reopened. |
 
 ---
 

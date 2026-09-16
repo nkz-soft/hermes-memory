@@ -49,8 +49,3 @@ def test_a_changed_conversation_is_not_skipped() -> None:
 def test_a_failed_import_is_retried_rather_than_skipped() -> None:
     """§18 — and the reason a failure is recorded at all rather than omitted (research R10)."""
     assert may_skip(record(ImportStatus.FAILED), HASH) is False
-
-
-def test_a_previously_skipped_conversation_is_not_treated_as_imported() -> None:
-    """A skip records that we did nothing. Reading it as success would strand the conversation."""
-    assert may_skip(record(ImportStatus.SKIPPED), HASH) is False

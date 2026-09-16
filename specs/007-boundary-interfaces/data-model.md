@@ -48,7 +48,7 @@ category; it may not turn the field into a free string.
 
 | Field | Type | Required | Rule |
 |---|---|---|---|
-| `counts` | `Mapping[RedactionCategory, int]` | yes | every count ≥ 1; a category with none redacted is absent, not zero |
+| `counts` | `Mapping[RedactionCategory, int]` | yes | every count ≥ 1; a category with none redacted is absent, not zero; held read-only |
 
 Derived: `total` → the sum of the counts. `is_empty` → no counts at all.
 
@@ -68,11 +68,11 @@ The §17 record, and §18's outcome vocabulary.
 |---|---|---|---|
 | `source` | `Source` | yes | closed vocabulary, from #8 |
 | `source_id` | `OpaqueIdentifier` | yes | the source's native id |
-| `content_hash` | `Text` | yes | the value #8 computes; the importer never invents one |
+| `content_hash` | `Text` | yes | #8's hash of the conversation **as read, before sanitization** — what the source yields next time; the hash of the redacted form would never match once anything was redacted |
 | `document_id` | `Text` | yes | §10 shape, derived by #8 |
 | `recorded_at` | `Timestamp` | yes | when the importer wrote this record — the import clock, never the conversation's (§11) |
-| `status` | `ImportStatus` | yes | including `failed` (R10) |
-| `error` | `Text \| None` | no | present only for `failed`; carries no conversation content and no credential (R5) |
+| `status` | `ImportStatus` | yes | `imported` or `failed`; **`skipped` is refused** — it is the run's report, and a stored skip would overwrite the record it was decided from |
+| `error` | `Text \| None` | for `failed` | required for `failed`, refused otherwise; carries no conversation content and no credential (R5) |
 
 The skip decision is one function, defined here and not in any store (R10, FR-012):
 
@@ -81,7 +81,7 @@ may_skip(record: ImportRecord | None, content_hash: str) -> bool
 ```
 
 It is true when a record exists, its status is `imported`, and its content hash equals the one
-offered. It is false for no record, for a `failed` or `skipped` record, and for a changed hash.
+offered. It is false for no record, for a `failed` record, and for a changed hash.
 
 ## `RecallResult` — `memory/interface/store.py`
 

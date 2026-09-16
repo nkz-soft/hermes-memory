@@ -77,7 +77,7 @@ def test_cs5_catches_a_source_that_stops_at_the_first_bad_conversation() -> None
 def test_ss3_catches_a_sanitizer_that_reports_what_it_did_not_do() -> None:
     """The report looks compliant; the credential is still in the text (Principle V)."""
     with pytest.raises(AssertionError):
-        _BrokenSanitizer().test_ss3_the_secret_is_gone_from_every_message()
+        _BrokenSanitizer().test_ss3_the_secret_is_gone_from_everything_that_leaves_the_sanitizer()
 
 
 def test_pc2_and_pc5_catch_a_classifier_that_raises_instead_of_answering_unknown() -> None:

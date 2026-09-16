@@ -13,10 +13,21 @@ from hermes_memory.normalization import Source
 class InMemoryImportState:
     """Remembers the latest record per conversation, failures included."""
 
-    def __init__(self, *, unavailable: bool = False, corrupt: bool = False) -> None:
-        self._records: dict[tuple[Source, str], ImportRecord] = {}
+    def __init__(
+        self,
+        *,
+        unavailable: bool = False,
+        corrupt: bool = False,
+        backing: dict[tuple[Source, str], ImportRecord] | None = None,
+    ) -> None:
+        # `backing` stands in for #14's database file: see `InMemoryRawArchive` and IS-9.
+        self._records = backing if backing is not None else {}
         self._unavailable = unavailable
         self._corrupt = corrupt
+
+    def reopened(self) -> InMemoryImportState:
+        """A new instance over the same backing — the state after a restart."""
+        return InMemoryImportState(backing=self._records)
 
     @property
     def records(self) -> tuple[ImportRecord, ...]:

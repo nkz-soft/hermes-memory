@@ -76,15 +76,19 @@ ALLOWED_THIRD_PARTY = frozenset({"pydantic"})
 ALLOWED_INTERNAL = (
     "hermes_memory.errors",
     "hermes_memory.normalization",
-    "hermes_memory.archive",
+    "hermes_memory.archive.interface",
 )
 """What an interface module may import from inside the package.
 
-`hermes_memory.archive` is here for one reason, and it is worth stating rather than leaving to be
-puzzled over: `ingestion/source.py` names `OriginalPayload`, because a source yields a conversation
-together with the bytes it was read from and the archive is what those bytes are for (Principle I).
-One interface naming another interface's value type is the dependency Principle IV wants — on the
-declaration, never on an implementation.
+`hermes_memory.archive.interface` is here for one reason, and it is worth stating rather than
+leaving to be puzzled over: `ingestion/source.py` names `OriginalPayload`, because a source yields
+a conversation together with the bytes it was read from, and the archive is what those bytes are
+for (Principle I). One interface naming another interface's value type is the dependency
+Principle IV wants — on the declaration, never on an implementation.
+
+It is the module and not the `hermes_memory.archive` package, to say which thing is depended on.
+Python still initializes the package on the way in, so the matching rule lives on
+`archive/__init__.py`: it re-exports the interface and no implementation.
 """
 
 FORBIDDEN_AT_RUNTIME = (

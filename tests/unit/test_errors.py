@@ -102,3 +102,20 @@ def test_the_underlying_failure_is_chained_for_reading_not_for_catching() -> Non
     except TransientBoundaryError as error:
         assert isinstance(error.__cause__, TimeoutError)
         assert "socket" not in str(error)
+
+
+def test_a_subclass_cannot_redeclare_which_branch_it_is_on() -> None:
+    """E3 closed from the other side: a permanent failure cannot be subclassed into a retryable one.
+
+    Without this, `class Oops(PermanentBoundaryError): retryable = True` would be caught by a
+    reporter as permanent and retried by #20 as transient — two answers to one question.
+    """
+    with pytest.raises(TypeError, match="retryable"):
+
+        class Retryable(PermanentBoundaryError):
+            retryable = True
+
+    with pytest.raises(TypeError, match="retryable"):
+
+        class NeverRetried(TransientBoundaryError):
+            retryable = False

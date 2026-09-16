@@ -10,6 +10,16 @@ contract:
   easier and would demand something no memory engine owes us (research.md R9).
 * **It never asserts a score's value.** `score` is comparable within one result set and nowhere
   else; a threshold here would be a promise about Hindsight's ranking.
+
+And two things it is careful about, because #16 is a semantic engine with LLM extraction behind it:
+
+* **It never compares result counts across calls.** Extraction produces a varying number of
+  facts per document, so "as many results as before" is flaky against the real thing. A
+  duplicate is detected within one result set instead: the same content, for the same document,
+  twice.
+* **It never expects an arbitrary query to find nothing.** Vector recall returns nearest neighbours.
+  Emptiness is asserted only where it holds for any engine — a store that holds nothing — and
+  replacement is asserted as "the old content is gone", not as "the old query finds nothing".
 """
 
 from __future__ import annotations
@@ -25,6 +35,24 @@ from hermes_memory.memory.interface import (
 )
 from hermes_memory.normalization import ProjectTag
 from tests.contracts import conversations
+
+
+def duplicated(results: tuple[RecallResult, ...]) -> list[tuple[str, str]]:
+    """Content returned more than once for the same document, within one result set.
+
+    What a duplicated document looks like to a caller, whatever the engine: the same thing said
+    twice about one conversation. A second, different fact about the same conversation is ordinary
+    extraction, and is not counted.
+    """
+    seen: set[tuple[str, str]] = set()
+    repeated: list[tuple[str, str]] = []
+    for result in results:
+        key = (result.provenance.source_id, result.content)
+        if key in seen:
+            repeated.append(key)
+        seen.add(key)
+    return repeated
+
 
 PHRASE = "Wolverine"
 """A distinctive word planted in the conversation and used as the recall query."""
@@ -64,14 +92,19 @@ class MemoryStoreContract:
         enriched = conversations.enrich(conversations.conversation())
 
         store.retain(enriched)
-        after_one = store.recall(PHRASE)
         store.retain(enriched)
-        after_two = store.recall(PHRASE)
+        results = store.recall(PHRASE)
 
-        assert len(after_two) == len(after_one)
+        assert results
+        assert duplicated(results) == []
 
     def test_ms3_re_retaining_changed_content_replaces_rather_than_adds(self) -> None:
-        """§9's `update_mode: replace`: one logical document, whatever it said last time."""
+        """§9's `update_mode: replace`: one logical document, whatever it said last time.
+
+        Asserted as "the old content is gone" rather than "the old query finds nothing": a semantic
+        engine returns the nearest neighbour for any query, and a saga conversation about Rebus is a
+        near neighbour of one about Wolverine.
+        """
         store = self.make_store()
         first = conversations.enrich(
             conversations.conversation(text="We moved the saga to Wolverine in March.")
@@ -84,14 +117,17 @@ class MemoryStoreContract:
         store.retain(first)
         store.retain(second)
 
-        assert store.recall(PHRASE) == ()
         assert store.recall("Rebus")
+        for query in (PHRASE, "Rebus"):
+            assert all(PHRASE not in result.content for result in store.recall(query))
 
-    def test_ms4_recalling_nothing_is_an_empty_result_not_a_failure(self) -> None:
-        store = self.make_store()
-        store.retain(conversations.enrich(conversations.conversation()))
+    def test_ms4_a_store_holding_nothing_recalls_nothing(self) -> None:
+        """An empty result, not a failure — asserted where it holds for any engine.
 
-        assert store.recall("a phrase nobody ever wrote down") == ()
+        A store with content returns nearest neighbours for any query, so "a phrase nobody wrote"
+        is not a fair test of emptiness. A store that holds nothing has no neighbours to return.
+        """
+        assert self.make_store().recall(PHRASE) == ()
 
     def test_ms5_results_carry_the_provenance_they_were_retained_with(self) -> None:
         store = self.make_store()
@@ -122,7 +158,7 @@ class MemoryStoreContract:
         for index in range(3):
             store.retain(conversations.enrich(conversations.conversation(f"c{index}")))
 
-        assert len(store.recall(PHRASE, limit=2)) <= 2
+        assert 1 <= len(store.recall(PHRASE, limit=2)) <= 2
 
     def test_ms8_a_refused_call_is_a_permanent_failure(self) -> None:
         store = self.make_rejecting_store()
@@ -131,8 +167,10 @@ class MemoryStoreContract:
 
         with pytest.raises(MemoryStoreRejected) as raised:
             store.retain(conversations.enrich(conversations.conversation()))
-
         assert raised.value.retryable is False
+
+        with pytest.raises(MemoryStoreRejected):
+            store.recall(PHRASE)
 
     def test_ms9_an_unreachable_engine_is_a_transient_failure(self) -> None:
         """§18's retry list: timeout, reset, 429, 502, 503, 504 — what #20 repeats."""
@@ -142,8 +180,10 @@ class MemoryStoreContract:
 
         with pytest.raises(MemoryStoreUnavailable) as raised:
             store.retain(conversations.enrich(conversations.conversation()))
-
         assert raised.value.retryable is True
+
+        with pytest.raises(MemoryStoreUnavailable):
+            store.recall(PHRASE)
 
     def test_ms10_no_library_exception_crosses_the_boundary(self) -> None:
         for store in (self.make_rejecting_store(), self.make_unavailable_store()):
@@ -157,13 +197,19 @@ class MemoryStoreContract:
                 pytest.fail(f"a non-boundary exception crossed the boundary: {leaked!r}")
 
     def test_ms11_a_large_conversation_is_one_document_to_its_caller(self) -> None:
-        """§9 may deliver one document in parts; a caller must not be able to tell (FR-010)."""
+        """§9 may deliver one document in parts; a caller must not be able to tell (FR-010).
+
+        A split that re-delivered a part on a second retain would show up as the same content twice
+        for the same document, which is what `duplicated` looks for.
+        """
         store = self.make_store()
         long_text = " ".join(f"Wolverine handles step {index}." for index in range(500))
         enriched = conversations.enrich(conversations.conversation("large1", text=long_text))
 
         store.retain(enriched)
-        first = store.recall(PHRASE)
         store.retain(enriched)
+        results = store.recall(PHRASE)
 
-        assert len(store.recall(PHRASE)) == len(first)
+        assert results
+        assert {result.provenance.source_id for result in results} == {"large1"}
+        assert duplicated(results) == []

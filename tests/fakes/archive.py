@@ -19,10 +19,22 @@ from hermes_memory.normalization import EnrichedConversation
 class InMemoryRawArchive:
     """Holds both forms in a dictionary, last write wins."""
 
-    def __init__(self, *, unavailable: bool = False, rejects: bool = False) -> None:
-        self._documents: dict[str, tuple[EnrichedConversation, OriginalPayload]] = {}
+    def __init__(
+        self,
+        *,
+        unavailable: bool = False,
+        rejects: bool = False,
+        backing: dict[str, tuple[EnrichedConversation, OriginalPayload]] | None = None,
+    ) -> None:
+        # `backing` stands in for the directory #13 will write to: two instances over one backing
+        # are the same archive reopened, which is what RA-9 needs to tell stored from remembered.
+        self._documents = backing if backing is not None else {}
         self._unavailable = unavailable
         self._rejects = rejects
+
+    def reopened(self) -> InMemoryRawArchive:
+        """A new instance over the same backing — the archive after a restart."""
+        return InMemoryRawArchive(backing=self._documents)
 
     @property
     def document_ids(self) -> frozenset[str]:

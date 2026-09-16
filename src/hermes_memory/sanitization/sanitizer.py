@@ -25,9 +25,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Protocol, runtime_checkable
 
-from pydantic import field_validator
+from pydantic import field_serializer, field_validator
 
 from hermes_memory.errors import PermanentBoundaryError
 from hermes_memory.normalization import Conversation
@@ -87,7 +88,16 @@ class RedactionReport(FrozenModel):
                     f"a count must be at least 1, got {count} for {category}; a category with "
                     "nothing redacted is left out"
                 )
-        return counts
+        # Read-only, so that the model being frozen is true of what it holds: an editable mapping
+        # would let a caller write the zero this validator refuses.
+        return MappingProxyType(dict(counts))
+
+    @field_serializer("counts")
+    def _serialize_as_a_plain_mapping(
+        self, counts: Mapping[RedactionCategory, int]
+    ) -> dict[RedactionCategory, int]:
+        """The read-only view is for holding; what leaves the model is an ordinary dict."""
+        return dict(counts)
 
     @property
     def total(self) -> int:

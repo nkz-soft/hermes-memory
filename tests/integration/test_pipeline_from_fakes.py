@@ -76,7 +76,12 @@ def test_pl1_one_conversation_goes_all_the_way_through(no_io: None) -> None:
     assert remembered is not None
     assert remembered.status is ImportStatus.IMPORTED
     assert remembered.document_id == "chatgpt:leaky1"
-    assert remembered.content_hash == archived.content_hash()
+    # The hash of the conversation as read, not as archived: the archived one is redacted, and
+    # the next run compares against what the source yields (data-model.md, ImportRecord).
+    assert (
+        remembered.content_hash == conversations.conversation_with_a_secret("leaky1").content_hash()
+    )
+    assert remembered.content_hash != archived.content_hash()
 
 
 def test_pl1_the_redaction_report_reaches_the_run(no_io: None) -> None:
@@ -257,3 +262,50 @@ def test_pl4_a_failure_is_recorded_and_is_not_the_same_as_never_attempted(no_io:
 
     assert retried.imported == ["a"]
     assert retried.skipped == []
+
+
+def test_pl2_a_conversation_that_carried_a_secret_is_skipped_too(no_io: None) -> None:
+    """§17's hash is of the conversation *as read*, before sanitization.
+
+    Recording the hash of the redacted conversation and comparing the hash of the raw one means
+    they never match once anything was redacted — so every conversation that ever carried a secret
+    is re-extracted on every refresh. It is also the only choice that stays stable when #11's
+    redaction rules change: new patterns must not look like new content.
+    """
+    state = InMemoryImportState()
+    read_once = read(conversations.conversation_with_a_secret("leaky1"))
+
+    assemble(conversations_read=read_once, state=state).run(now=NOW)
+    second = assemble(conversations_read=read_once, state=state).run(now=NOW)
+
+    assert second.skipped == ["leaky1"]
+    assert second.imported == []
+
+
+def test_pl4_the_run_survives_the_import_state_itself_being_unavailable(no_io: None) -> None:
+    """§18 — even recording a failure can fail, and that must not be what aborts the run."""
+    outcome = assemble(
+        conversations_read=read(conversations.conversation("a"), conversations.conversation("b")),
+        state=InMemoryImportState(unavailable=True),
+    ).run(now=NOW)
+
+    assert [failure.source_id for failure in outcome.failed] == ["a", "b"]
+    assert all(failure.retryable for failure in outcome.failed)
+
+
+def test_pl4_a_failure_that_concerns_no_conversation_is_still_reported(no_io: None) -> None:
+    """An unreachable export fails no conversation in particular, and must not be reported as ""."""
+    pipeline = Pipeline(
+        source=InMemoryConversationSource(unreachable=True),
+        sanitizer=InMemorySecretSanitizer(),
+        classifier=InMemoryProjectClassifier(),
+        archive=InMemoryRawArchive(),
+        store=InMemoryMemoryStore(),
+        state=InMemoryImportState(),
+    )
+
+    outcome = pipeline.run(now=NOW)
+
+    assert len(outcome.failed) == 1
+    assert outcome.failed[0].source_id == "<export>"
+    assert outcome.failed[0].retryable is True

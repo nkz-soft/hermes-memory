@@ -23,6 +23,9 @@ from hermes_memory.errors import BoundaryError
 from tests.contracts import conversations
 
 PAYLOAD = OriginalPayload(content=b'{"conversation": "as exported"}', media_type="application/json")
+SECOND_PAYLOAD = OriginalPayload(
+    content=b'{"conversation": "re-exported"}', media_type="application/json"
+)
 
 
 class RawArchiveContract:
@@ -39,6 +42,15 @@ class RawArchiveContract:
 
     def make_rejecting_archive(self) -> RawArchive | None:
         """Return an archive that refuses what it is given, or `None`."""
+        return None
+
+    def reopen(self, archive: RawArchive) -> RawArchive | None:
+        """Return a *new* archive over the same storage as this one, or `None`.
+
+        The way RA-9 tells "stored" from "remembered by this object": #13 on local storage returns
+        a fresh instance over the same directory. An implementation that cannot be reopened says so,
+        and RA-9 is skipped rather than passed on the strength of an in-memory cache.
+        """
         return None
 
     # --- the contract ---------------------------------------------------------------------------
@@ -64,16 +76,17 @@ class RawArchiveContract:
         assert loaded.media_type == PAYLOAD.media_type
 
     def test_ra3_storing_twice_leaves_one_document_and_the_second_wins(self) -> None:
-        """A re-run after a crash must not multiply the source of truth."""
+        """A re-run after a crash must not multiply the source of truth — either form of it."""
         archive = self.make_archive()
         first = conversations.enrich(conversations.conversation(text="The first answer."))
         second = conversations.enrich(conversations.conversation(text="The corrected answer."))
         assert first.document_id == second.document_id
 
         archive.store(first, PAYLOAD)
-        archive.store(second, PAYLOAD)
+        archive.store(second, SECOND_PAYLOAD)
 
         assert archive.load(second.document_id) == second
+        assert archive.load_original(second.document_id).content == SECOND_PAYLOAD.content
 
     def test_ra4_loading_an_unknown_document_is_a_declared_permanent_failure(self) -> None:
         with pytest.raises(ArchiveDocumentNotFound) as raised:
@@ -124,12 +137,20 @@ class RawArchiveContract:
             except Exception as leaked:
                 pytest.fail(f"a non-boundary exception crossed the boundary: {leaked!r}")
 
-    def test_ra9_a_stored_document_is_loadable_once_store_returns(self) -> None:
-        """§7 archives before retaining: a deferred write is the source of truth arriving late."""
-        archive = self.make_archive()
-        enriched = conversations.enrich(conversations.conversation())
+    def test_ra9_a_stored_document_survives_reopening_the_archive(self) -> None:
+        """Principle I — durable once `store` returns, not merely remembered by the object.
 
+        §7 archives before retaining, so an archive that held the document only in memory when the
+        process died would leave the derived memory ahead of the source of truth.
+        """
+        archive = self.make_archive()
+        enriched = conversations.enrich(conversations.conversation_using_every_field())
         archive.store(enriched, PAYLOAD)
 
-        assert archive.load(enriched.document_id) == enriched
-        assert archive.load_original(enriched.document_id).content == PAYLOAD.content
+        reopened = self.reopen(archive)
+        if reopened is None:
+            pytest.skip("this implementation cannot be reopened over the same storage")
+        assert reopened is not archive, "reopen must return a new instance, not the same object"
+
+        assert reopened.load(enriched.document_id) == enriched
+        assert reopened.load_original(enriched.document_id).content == PAYLOAD.content

@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Protocol, runtime_checkable
 
-from hermes_memory.archive import OriginalPayload
+from hermes_memory.archive.interface import OriginalPayload
 from hermes_memory.errors import PermanentBoundaryError, TransientBoundaryError
 from hermes_memory.normalization import Conversation, Source
 from hermes_memory.normalization.base import FrozenModel

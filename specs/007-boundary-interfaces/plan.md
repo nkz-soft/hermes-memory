@@ -288,7 +288,7 @@ Three things the design phase sharpened rather than left implied:
 
 ## What implementation changed
 
-Four things the design did not foresee, each found by writing a test or a fake rather than by
+Four things the design did not foresee during implementation, each found by writing a test or a fake rather than by
 reading, and each recorded where it now lives:
 
 1. **A source yields the conversation with the bytes it came from** (`SourceConversation`). The
@@ -304,6 +304,16 @@ reading, and each recorded where it now lives:
 4. **The layout guard filters per file, not per walk root.** A recorded parent (`memory`) rglobs
    into its recorded children, so the dotted-prefix match of R15 alone still reported the filled
    `memory/interface`. The sibling test caught it.
+
+Code review then found three more, fixed before the pull request:
+
+5. **The stored content hash was of the sanitized conversation**, so a conversation that ever carried
+   a secret was re-imported on every run. The record now holds the hash as read, and PL-2 covers the
+   secret case.
+6. **Several memory store rules were unimplementable for a semantic engine** (they compared result
+   counts and expected empty recalls). Reshaped around documents; see contract-suites.md.
+7. **SS-3 inspected message text only**, leaving titles and tool output — §13's own example — unchecked.
+   It now asserts over the whole serialized conversation.
 
 None changes a principle, and the constitution re-check above still holds.
 

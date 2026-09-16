@@ -12,7 +12,15 @@ from __future__ import annotations
 
 import pytest
 
-from hermes_memory.normalization import Conversation, Message, Role, Source
+from hermes_memory.normalization import (
+    Conversation,
+    Message,
+    NonTextKind,
+    NonTextPart,
+    Role,
+    Source,
+    ToolActivity,
+)
 from hermes_memory.sanitization import (
     RedactionCategory,
     RedactionReport,
@@ -41,16 +49,29 @@ class SecretSanitizerContract:
     # --- helpers ---------------------------------------------------------------------------------
 
     def _conversation_containing(self, secret: str) -> Conversation:
+        """The secret everywhere a conversation can carry text, not only in a message body.
+
+        §13's own example is tool output, and the title travels to the memory store in provenance.
+        A sanitizer that only rewrote message text would pass a suite that only looked there.
+        """
         return Conversation(
             source=Source.CHATGPT,
             source_id="leaky1",
-            title="A failing GitLab call",
+            title=f"Why does token {secret} return 401?",
             started_at=conversations.STARTED_AT,
             messages=(
                 Message(
                     role=Role.ASSISTANT,
                     text=f"GitLab request using token {secret} returned HTTP 401 Unauthorized.",
                     sent_at=conversations.STARTED_AT,
+                    tool_activity=(
+                        ToolActivity(
+                            name="http",
+                            request=f"GET /api/v4/projects PRIVATE-TOKEN: {secret}",
+                            result=f"401 Unauthorized for token {secret}",
+                        ),
+                    ),
+                    non_text_parts=(NonTextPart(kind=NonTextKind.FILE, name=f"{secret}.env"),),
                 ),
             ),
         )
@@ -79,12 +100,17 @@ class SecretSanitizerContract:
         assert len(sanitized.messages) == len(original.messages)
         assert [m.role for m in sanitized.messages] == [m.role for m in original.messages]
 
-    def test_ss3_the_secret_is_gone_from_every_message(self) -> None:
+    def test_ss3_the_secret_is_gone_from_everything_that_leaves_the_sanitizer(self) -> None:
+        """Title, message text, tool requests and results, attachment names — all of it.
+
+        Asserted over the serialized conversation rather than field by field, so that a field added
+        to #8's model later is covered without anyone remembering to add it here (Principle V).
+        """
         secret, _ = self.secret_sample()
 
         sanitized, _ = self.make_sanitizer().sanitize(self._conversation_containing(secret))
 
-        assert all(secret not in message.text for message in sanitized.messages)
+        assert secret not in sanitized.model_dump_json()
 
     def test_ss4_the_surrounding_context_is_preserved(self) -> None:
         """§13: the context is usually the knowledge worth keeping; dropping the line is wrong."""

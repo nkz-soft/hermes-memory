@@ -81,6 +81,15 @@ class TestRedactionReport:
             "kubernetes-secret",
         }
 
+    def test_its_counts_cannot_be_edited_after_construction(self) -> None:
+        """Frozen means frozen: editing the mapping would bypass the validator refusing zeros."""
+        report = RedactionReport(counts={RedactionCategory.PASSWORD: 1})
+
+        with pytest.raises(TypeError):
+            report.counts[RedactionCategory.JWT] = 0  # type: ignore[index]
+
+        assert report.model_dump() == {"counts": {RedactionCategory.PASSWORD: 1}}
+
     def test_it_has_nowhere_to_put_a_redacted_value(self) -> None:
         """Principle V — a report carrying the secret defeats the mechanism that serves it."""
         assert set(RedactionReport.model_fields) == {"counts"}
@@ -145,6 +154,21 @@ class TestImportRecord:
         """An imported conversation carrying an error is a record nobody can act on."""
         with pytest.raises(ValidationError):
             self.record(status=ImportStatus.IMPORTED, error="the gateway timed out")
+
+    def test_a_skip_cannot_be_recorded(self) -> None:
+        """A skip is the run's report, never the state's memory.
+
+        Last write wins (IS-3), so a stored `skipped` record would overwrite the `imported` one and
+        `may_skip` would answer no on the next run — re-extracting the conversation on every other
+        refresh, forever. The type refuses rather than leaving it to every caller to remember.
+        """
+        with pytest.raises(ValidationError, match="skip"):
+            self.record(status=ImportStatus.SKIPPED)
+
+    def test_a_failure_must_say_why(self) -> None:
+        """§18 records each failure with its error; a failed record without one reports nothing."""
+        with pytest.raises(ValidationError):
+            self.record(status=ImportStatus.FAILED)
 
     def test_the_recorded_time_is_timezone_aware(self) -> None:
         with pytest.raises(ValidationError):

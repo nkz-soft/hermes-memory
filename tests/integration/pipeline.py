@@ -26,6 +26,7 @@ version is wrong:
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -41,12 +42,16 @@ from hermes_memory.ingestion import (
 )
 from hermes_memory.memory.interface import MemoryStore
 from hermes_memory.normalization import (
+    Conversation,
     EnrichedConversation,
     ProjectTag,
     Provenance,
     SourceTag,
 )
 from hermes_memory.sanitization import RedactionReport, SecretSanitizer
+
+EXPORT = "<export>"
+"""The subject of a failure that concerns the export as a whole rather than one conversation."""
 
 
 @dataclass(frozen=True)
@@ -100,13 +105,16 @@ class Pipeline:
 
                 self.archive.store(enriched, read.original)
                 self.store.retain(enriched)
-                self._record(enriched, ImportStatus.IMPORTED, now=now)
+                self._record_import(conversation, enriched, now=now)
 
                 outcome.imported.append(conversation.source_id)
                 outcome.redactions = _merge(outcome.redactions, report)
             except BoundaryError as failure:
                 outcome.failed.append(Failure(conversation.source_id, failure))
-                self._record_failure(conversation, failure, now=now)
+                # The state may be what failed, or fail again. The report already holds this
+                # conversation; the next run finds no record and retries it, which is right.
+                with suppress(BoundaryError):
+                    self._record_failure(conversation, failure, now=now)
 
         return outcome
 
@@ -115,7 +123,7 @@ class Pipeline:
         try:
             reader = self.source.read()
         except BoundaryError as failure:
-            outcome.failed.append(Failure(failure.subject or "", failure))
+            outcome.failed.append(Failure(failure.subject or EXPORT, failure))
             return
 
         while True:
@@ -124,7 +132,7 @@ class Pipeline:
             except StopIteration:
                 return
             except BoundaryError as failure:
-                outcome.failed.append(Failure(failure.subject or "", failure))
+                outcome.failed.append(Failure(failure.subject or EXPORT, failure))
 
     def _enrich(self, conversation, project: ProjectTag, *, now: datetime) -> EnrichedConversation:
         return EnrichedConversation(
@@ -140,17 +148,24 @@ class Pipeline:
             tags=(SourceTag(value=conversation.source), project),
         )
 
-    def _record(
-        self, enriched: EnrichedConversation, status: ImportStatus, *, now: datetime
+    def _record_import(
+        self, as_read: Conversation, enriched: EnrichedConversation, *, now: datetime
     ) -> None:
+        """Remember an import under the hash of the conversation **as read**, not as sanitized.
+
+        The skip compares against the hash of what the source yields next time, which is the raw
+        conversation; a record holding the hash of the redacted one would never match, and every
+        conversation that ever carried a secret would be re-extracted on every run. It also keeps
+        a change to #11's redaction rules from looking like a change of content (data-model.md).
+        """
         self.state.record(
             ImportRecord(
-                source=enriched.conversation.source,
-                source_id=enriched.conversation.source_id,
-                content_hash=enriched.content_hash(),
+                source=as_read.source,
+                source_id=as_read.source_id,
+                content_hash=as_read.content_hash(),
                 document_id=enriched.document_id,
                 recorded_at=now,
-                status=status,
+                status=ImportStatus.IMPORTED,
             )
         )
 
