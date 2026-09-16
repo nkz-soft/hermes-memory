@@ -212,7 +212,18 @@ def _holds_only_a_docstring(source: Path) -> bool:
     return len(body) <= 1 and bool(not body or ast.get_docstring(ast.Module(body, [])))
 
 
-FILLED_BOUNDARIES = frozenset({"observability", "cli", "normalization"})
+FILLED_BOUNDARIES = frozenset(
+    {
+        "observability",
+        "cli",
+        "normalization",
+        "ingestion",
+        "sanitization",
+        "classification",
+        "archive",
+        "memory.interface",
+    }
+)
 """The recorded boundaries a feature has filled with an implementation, and when.
 
 * ``observability`` — 003-logging-telemetry-baseline. The structured logging pipeline and the
@@ -224,6 +235,19 @@ FILLED_BOUNDARIES = frozenset({"observability", "cli", "normalization"})
   of ARCHITECTURE.md §7: what every other stage passes across the boundaries of §8. It is held to
   its own guard instead — ``tests/structure/test_normalization_boundary.py`` asserts that nothing
   in it reaches Hindsight, HTTP or storage (Principle IV).
+* ``ingestion``, ``sanitization``, ``classification``, ``archive``, ``memory.interface`` —
+  007-boundary-interfaces. Five of the six boundaries of ARCHITECTURE.md §8, declared as the
+  interfaces Principle IV requires. They hold protocols and the small value types those protocols
+  name; no implementation of any boundary lives in ``src/`` (that is #10 through #16), and
+  ``tests/structure/test_boundary_interfaces.py`` holds them to reaching neither Hindsight, HTTP
+  nor storage.
+
+Entries are matched by **dotted prefix**, so ``memory.interface`` fills that module and leaves
+``memory.hindsight`` guarded. Matching on the first segment — as this set did until
+007-boundary-interfaces — would have meant filling the interface by adding ``memory``, exempting
+``memory/hindsight`` in the feature whose whole subject is keeping Hindsight in one place
+(specs/007-boundary-interfaces/research.md R15).
+``test_filling_a_submodule_does_not_exempt_its_sibling`` is that case, run rather than asserted.
 
 Every other recorded module is still held to holding nothing but a docstring, and filling one is an
 edit to this set inside the feature's own commit — which is the point. A guard that exempted any
@@ -231,17 +255,42 @@ module that happened to contain code would be a guard deleting itself.
 """
 
 
+def _is_filled(module: str) -> bool:
+    """Whether a feature has filled this recorded module, by dotted prefix.
+
+    ``memory.interface`` matches itself and anything beneath it, and does not match
+    ``memory.hindsight``. A plain ``in`` test would miss the descendants; a first-segment test
+    would catch the sibling.
+    """
+    return any(module == filled or module.startswith(f"{filled}.") for filled in FILLED_BOUNDARIES)
+
+
+def _module_of(source: Path) -> str:
+    """The dotted module path a source file sits in, relative to the package root."""
+    return source.parent.relative_to(PACKAGE_ROOT).as_posix().replace("/", ".")
+
+
 def _recorded_module_sources() -> list[Path]:
     """Every ``.py`` file inside a recorded module that no feature has filled yet.
 
     Every file in those directories is inspected, not only ``__init__.py``: the guard is worth
     nothing if behaviour can be added in a sibling module inside the same boundary.
+
+    Filled-ness is decided by **the module the file sits in**, not by the recorded module the walk
+    started from, and the result is deduplicated. A recorded parent reaches its recorded children —
+    ``memory`` rglobs into ``memory/interface`` — so filtering only at the start of the walk would
+    have reported every file of a filled child whose parent is not filled, which is exactly the
+    ``memory.interface`` case 007-boundary-interfaces needed
+    (specs/007-boundary-interfaces/research.md R15).
     """
     return sorted(
-        source
-        for module in recorded_modules()
-        if module.split(".")[0] not in FILLED_BOUNDARIES
-        for source in (PACKAGE_ROOT / Path(module.replace(".", "/"))).rglob("*.py")
+        {
+            source
+            for module in recorded_modules()
+            if not _is_filled(module)
+            for source in (PACKAGE_ROOT / Path(module.replace(".", "/"))).rglob("*.py")
+            if not _is_filled(_module_of(source))
+        }
     )
 
 
@@ -286,14 +335,52 @@ def test_the_behaviour_guard_still_bites(tmp_path, monkeypatch) -> None:
     A weakened assertion that nobody has seen fail is a weakened assertion nobody knows about.
     This builds a package root holding one recorded module with real code in it, and insists the
     guard reports it.
+
+    The module used here was ``archive`` until 007-boundary-interfaces filled it. It is
+    ``evaluation`` now — a boundary no feature has reached — because a guard demonstrated against a
+    module that is exempt demonstrates nothing.
     """
     fake_root = tmp_path / "hermes_memory"
-    (fake_root / "archive").mkdir(parents=True)
-    (fake_root / "archive" / "__init__.py").write_text('"""A boundary."""\n', encoding="utf-8")
-    (fake_root / "archive" / "store.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (fake_root / "evaluation").mkdir(parents=True)
+    (fake_root / "evaluation" / "__init__.py").write_text('"""A boundary."""\n', encoding="utf-8")
+    (fake_root / "evaluation" / "score.py").write_text("VALUE = 1\n", encoding="utf-8")
 
     monkeypatch.setattr("tests.structure.test_module_layout.PACKAGE_ROOT", fake_root)
     monkeypatch.setattr("tests.structure.test_module_layout.REPO_ROOT", tmp_path)
 
-    with pytest.raises(AssertionError, match=re.escape("archive/store.py")):
+    with pytest.raises(AssertionError, match=re.escape("evaluation/score.py")):
         test_recorded_modules_carry_no_behaviour()
+
+
+def test_filling_a_submodule_does_not_exempt_its_sibling(tmp_path, monkeypatch) -> None:
+    """``memory.interface`` being filled leaves ``memory.hindsight`` guarded.
+
+    007-boundary-interfaces fills ``memory/interface/`` and nothing else under ``memory/``. The
+    first version of this guard matched a recorded module against ``FILLED_BOUNDARIES`` by its
+    first dotted segment, so the only way to fill the interface would have been to add ``memory``
+    — which would have exempted ``memory/hindsight`` from the behaviour guard in the very feature
+    whose subject is keeping Hindsight in one place (specs/007-boundary-interfaces/research.md
+    R15).
+
+    The match is by dotted prefix instead, and this is the case that proves the difference: code in
+    the filled module is allowed, code in its sibling is reported.
+    """
+    fake_root = tmp_path / "hermes_memory"
+    for module in ("memory", "memory/interface", "memory/hindsight"):
+        (fake_root / module).mkdir(parents=True, exist_ok=True)
+        (fake_root / module / "__init__.py").write_text('"""A boundary."""\n', encoding="utf-8")
+
+    (fake_root / "memory" / "interface" / "store.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (fake_root / "memory" / "hindsight" / "client.py").write_text("VALUE = 2\n", encoding="utf-8")
+
+    monkeypatch.setattr("tests.structure.test_module_layout.PACKAGE_ROOT", fake_root)
+    monkeypatch.setattr("tests.structure.test_module_layout.REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        "tests.structure.test_module_layout.FILLED_BOUNDARIES", frozenset({"memory.interface"})
+    )
+
+    with pytest.raises(AssertionError) as reported:
+        test_recorded_modules_carry_no_behaviour()
+
+    assert "memory/hindsight/client.py" in str(reported.value)
+    assert "memory/interface/store.py" not in str(reported.value)

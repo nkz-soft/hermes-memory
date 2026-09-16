@@ -120,8 +120,10 @@ for.
 class BoundaryError(Exception):
     retryable: ClassVar[bool]
 
+
 class TransientBoundaryError(BoundaryError):
     retryable: ClassVar[bool] = True
+
 
 class PermanentBoundaryError(BoundaryError):
     retryable: ClassVar[bool] = False
