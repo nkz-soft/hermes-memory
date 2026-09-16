@@ -70,6 +70,12 @@ class ConversationSource(Protocol):
         Reading twice yields equal conversations (CS-4) — a source is a reader over an export, not
         a cursor that consumes one. An empty export yields nothing and raises nothing (CS-3).
 
+        **The iterator stays usable after a `SourceFormatError`** (CS-5): the caller catches it,
+        records the failure and asks for the next conversation. That is what §18's "one failure
+        must not abort a run" means at this boundary, and it rules out the obvious implementation —
+        an exception raised inside a generator closes the generator for good, so a source yielding
+        from one cannot satisfy this. Write an iterator.
+
         Raises:
             SourceFormatError: for one unreadable conversation; iteration continues afterwards.
             SourceUnavailable: when the export cannot be reached at all.
