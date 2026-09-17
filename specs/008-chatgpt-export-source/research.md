@@ -72,6 +72,21 @@ directory case with the location already resolved.
 
 Peak memory is bounded by the largest single record plus one chunk, not by the export.
 
+Three refinements came out of review, each with a test:
+
+- A decode is also not trusted when it ends in a number that the next character could extend.
+  `raw_decode` takes `1500` out of `1500.0`.
+- Only a decode error within a few characters of the buffer's end, or an unterminated string, is
+  read as truncation. Any other error fails at once, so garbage is not buffered to the end of the
+  file first.
+- Some failures are not `JSONDecodeError`: an integer past the interpreter's digit limit, nesting
+  past the recursion limit, invalid UTF-8, or a compressed member that fails to inflate. These are
+  export-level `SourceFormatError`s too.
+
+A zip member's CRC is checked only once the member has been read to its end. A corrupted archive
+can therefore yield its early conversations before it fails, which streaming makes unavoidable.
+Text after the closing `]` is refused, so two concatenated arrays do not pass silently as one.
+
 A record that is valid JSON but not a readable conversation is a **per-conversation** failure
 (FR-019), and iteration continues. Text that is not valid JSON at all cannot be resynchronized:
 a scanner cannot find where the broken record ends. So it is an **export-level** permanent failure.
@@ -152,7 +167,9 @@ the spec says the conversation is not failed.
 
 **Decision.** On the thread, an assistant message whose `recipient` is not `all` is a **tool call**
 to the tool named by `recipient`. It becomes an assistant turn with empty text and one
-`ToolActivity(name=recipient, request=<its text>)`. If the **next** node on the thread is a message
+`ToolActivity(name=recipient, request=<its text>)`. Nodes omitted under R5 (hidden, hidden
+reasoning, structural) are transparent to adjacency, because folding runs over the turns that
+remain. If the **next** remaining turn is a message
 with role `tool` and `author.name` equal to that recipient, that node's text becomes the activity's
 `result`. The tool node is then **folded** into the call and does not become a turn of its own. A
 call not followed by such a node keeps `result` absent (FR-014). A tool message that answers no

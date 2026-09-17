@@ -51,9 +51,11 @@ def export_time(value: Any) -> datetime | None:
     """
     if value is None:
         return None
-    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
-        raise UnreadableRecord("a time is not a finite number of seconds")
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise UnreadableRecord("a time is not a number of seconds")
     try:
+        if not math.isfinite(value):  # raises OverflowError itself for an integer beyond a float
+            raise UnreadableRecord("a time is not a finite number of seconds")
         return datetime.fromtimestamp(value, UTC)
     except (OverflowError, OSError, ValueError) as out_of_range:
         raise UnreadableRecord("a time is outside the representable range") from out_of_range

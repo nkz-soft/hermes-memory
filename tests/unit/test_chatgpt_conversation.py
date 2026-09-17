@@ -125,7 +125,11 @@ def test_without_any_time_the_conversation_is_unreadable() -> None:
         _read(record)
 
 
-@pytest.mark.parametrize("bad", [float("nan"), float("inf"), 1e20, -1e20, "yesterday", True])
+@pytest.mark.parametrize(
+    "bad",
+    [float("nan"), float("inf"), 1e20, -1e20, 10**400, "yesterday", True],
+    ids=["nan", "inf", "far future", "far past", "huge integer", "string", "bool"],
+)
 def test_an_unusable_time_is_unreadable(bad) -> None:
     record = synth.linear_record("c", say("user", "a"))
     record["create_time"] = bad

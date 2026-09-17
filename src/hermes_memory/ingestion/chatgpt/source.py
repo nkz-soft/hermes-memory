@@ -114,6 +114,15 @@ class _Reader(Iterator[SourceConversation]):
             original=OriginalPayload(content=record.raw.encode("utf-8"), media_type=MEDIA_TYPE),
         )
 
+    def close(self) -> None:
+        """Release the export before the iteration is exhausted."""
+        self._finish()
+
+    def __del__(self) -> None:
+        # A caller that stops early holds the file open until this runs; on Windows an open file
+        # cannot be deleted or replaced, which is what a refresh (ADR-006) does to an export.
+        self._finish()
+
     def _close_stream(self) -> None:
         if self._stream is not None:
             self._stream.close()

@@ -87,6 +87,7 @@ BROKEN = {
     ),
     "not a node": lambda m: m.update(u2="text"),
     "children not a list": lambda m: m["u2"].update(children="a2"),
+    "duplicate child": lambda m: m["u2"]["children"].append("a2"),
 }
 
 

@@ -97,8 +97,14 @@ class Export:
                 return io.TextIOWrapper(self._archive.open(name), encoding="utf-8", newline="")
             assert self._directory is not None
             return (self._directory / name).open(encoding="utf-8", newline="")
-        except (OSError, zipfile.BadZipFile) as unreachable:
+        except OSError as unreachable:
             raise SourceUnavailable("a conversations file could not be opened") from unreachable
+        except (zipfile.BadZipFile, NotImplementedError, RuntimeError) as unopenable:
+            # A damaged member header, an unsupported compression method, or an encrypted member:
+            # none of them improves on a second attempt.
+            raise SourceFormatError("a conversations file in the archive cannot be opened") from (
+                unopenable
+            )
 
     def close(self) -> None:
         if self._archive is not None:

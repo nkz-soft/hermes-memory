@@ -6,12 +6,15 @@ starting at an index and says where the value ended. The scanner keeps a buffer,
 a decode fails for want of text, and hands back each element with the slice of text it came from —
 which is the conversation's original for the raw archive (Principle I, research R8).
 
-Two rules keep it honest:
+Three rules keep it honest:
 
-* **A decode that ends at the end of the buffer is not trusted** until the stream is exhausted.
-  `raw_decode` accepts `4` from a buffer that holds only the first digit of `42`.
+* **A decode that more text could change is not trusted** until more text has been read.
+  `raw_decode` accepts `4` from a buffer that holds only the first digit of `42`, and `1500` from
+  the first half of `1500.0`.
 * **The buffer at least doubles between attempts** at one element, so an element of n characters
   costs O(log n) decodes rather than one per chunk.
+* **Only an error at the edge of the buffer is read as "not enough text yet".** An error further
+  back is the text being wrong, and reading the rest of the file first would buffer all of it.
 
 Text that is not JSON cannot be resynchronized — nothing says where the broken element ends — so it
 ends the scan with an export-level `SourceFormatError`. The elements before it have been yielded.
@@ -20,6 +23,8 @@ ends the scan with an export-level `SourceFormatError`. The elements before it h
 from __future__ import annotations
 
 import json
+import zipfile
+import zlib
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any, TextIO
@@ -29,7 +34,39 @@ from hermes_memory.ingestion.source import SourceFormatError, SourceUnavailable
 __all__ = ["ExportRecord", "RecordScanner"]
 
 _WHITESPACE = " \t\r\n"
+_BYTE_ORDER_MARK = "﻿"
 _DEFAULT_CHUNK = 64 * 1024
+
+_UNSCANNABLE = (ValueError, RecursionError, EOFError, zipfile.BadZipFile, zlib.error)
+"""Failures that mean the file cannot be scanned any further, beyond a `JSONDecodeError`.
+
+An integer past the interpreter's digit limit (`ValueError`), nesting past the recursion limit, text
+that is not UTF-8 (`UnicodeDecodeError` is a `ValueError`), and a compressed member that fails to
+inflate or fails its CRC — which is only checked once the member has been read to its end.
+"""
+
+_NUMBER_CONTINUES = frozenset("0123456789.eE+-")
+
+_TRUNCATION_SLACK = 16
+"""How close to the end of the buffer a decode error must be to be read as "not enough text yet".
+
+The longest token a buffer can end inside without the decoder calling it unterminated is a literal
+or an escape — `false`, a `\\uXXXX` escape — so a small constant is enough.
+"""
+
+
+def _could_be_truncation(invalid: json.JSONDecodeError, buffered: int) -> bool:
+    return invalid.msg.startswith("Unterminated string") or (
+        invalid.pos >= buffered - _TRUNCATION_SLACK
+    )
+
+
+def _may_continue(value: object, buffer: str, end: int) -> bool:
+    """Whether more text could change the value just decoded: a number stops at the buffer's end."""
+    if end == len(buffer):
+        return True
+    is_number = isinstance(value, int | float) and not isinstance(value, bool)
+    return is_number and buffer[end] in _NUMBER_CONTINUES
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,22 +100,19 @@ class RecordScanner(Iterator[ExportRecord]):
             raise StopIteration
         try:
             return self._advance()
-        except StopIteration:
+        except (StopIteration, SourceFormatError):
             self._state = "done"
             raise
-        except SourceFormatError:
-            self._state = "done"
-            raise
-        except UnicodeDecodeError as undecodable:
-            self._state = "done"
-            raise SourceFormatError("a conversations file is not valid UTF-8") from undecodable
         except OSError as unreadable:
             self._state = "done"
             raise SourceUnavailable("a conversations file could not be read") from unreadable
+        except _UNSCANNABLE as unscannable:
+            self._state = "done"
+            raise SourceFormatError("a conversations file cannot be scanned") from unscannable
 
     def _advance(self) -> ExportRecord:
         if self._state == "start":
-            if self._peek() == "﻿":
+            if self._peek() == _BYTE_ORDER_MARK:
                 self._position += 1
             if self._peek() != "[":
                 raise SourceFormatError("a conversations file does not hold a JSON array")
@@ -89,28 +123,35 @@ class RecordScanner(Iterator[ExportRecord]):
         if next_character is None:
             raise SourceFormatError("a conversations file ends before its array does")
         if next_character == "]":
-            raise StopIteration
+            self._close_array()
         if self._state == "after":
             if next_character != ",":
                 raise SourceFormatError("a conversations file is not valid JSON")
             self._position += 1
             next_character = self._peek()
             if next_character == "]":
-                raise StopIteration
+                self._close_array()
             if next_character is None:
                 raise SourceFormatError("a conversations file ends before its array does")
         return self._decode_one()
+
+    def _close_array(self) -> None:
+        """The array ended, so the file must too: text after it means it is not one array."""
+        self._position += 1
+        if self._peek() is not None:
+            raise SourceFormatError("a conversations file continues after its array")
+        raise StopIteration
 
     def _decode_one(self) -> ExportRecord:
         while True:
             try:
                 value, end = self._decode(self._buffer, self._position)
             except json.JSONDecodeError as invalid:
-                if self._at_end:
+                if self._at_end or not _could_be_truncation(invalid, len(self._buffer)):
                     raise SourceFormatError("a conversations file is not valid JSON") from invalid
                 self._grow()
                 continue
-            if end == len(self._buffer) and not self._at_end:
+            if not self._at_end and _may_continue(value, self._buffer, end):
                 self._grow()
                 continue
             break

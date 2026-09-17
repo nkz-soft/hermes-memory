@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -234,6 +235,36 @@ def test_an_export_level_failure_is_not_repeated(tmp_path: Path) -> None:
     assert read == []
     assert len(failures) == 1
     assert failures[0].subject is None
+
+
+def test_a_corrupt_archive_member_is_a_format_failure(tmp_path: Path) -> None:
+    path = tmp_path / "export.zip"
+    records = [
+        synth.linear_record(f"conv-{i}", say("user", "compressible text " * 50)) for i in range(200)
+    ]
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("conversations.json", synth.export_text(records))
+    data = bytearray(path.read_bytes())
+    middle = len(data) // 2
+    data[middle : middle + 64] = bytes(64)
+    path.write_bytes(bytes(data))
+
+    _, failures = _drain(ChatGPTExportSource(path))
+
+    assert len(failures) == 1
+    assert isinstance(failures[0], SourceFormatError | SourceUnavailable)
+
+
+def test_an_abandoned_read_releases_the_export(tmp_path: Path) -> None:
+    path = synth.write_zip(tmp_path / "export.zip", _records())
+    iterator = ChatGPTExportSource(path).read()
+    next(iterator)
+
+    iterator.close()
+    path.unlink()
+
+    assert not path.exists()
+    assert next(iterator, None) is None
 
 
 def test_reading_twice_yields_equal_results(tmp_path: Path) -> None:

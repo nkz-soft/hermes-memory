@@ -94,6 +94,56 @@ def test_the_failure_message_carries_no_record_text() -> None:
     assert secret not in failure.message
 
 
+MIXED = [
+    {"conversation_id": "f", "create_time": 1772616600.123456, "weight": 1.5e3, "neg": -2.5e-7},
+    {"conversation_id": "g", "text": "crlf\r\nlineé ✓ 🚀 \\u escapes \t"},
+    {"conversation_id": "h", "n": [0, -0.0, 12345678901234567890, 1e300, True, False, None]},
+]
+
+
+@pytest.mark.parametrize("chunk_size", range(1, 17))
+def test_every_chunk_size_reads_the_same(chunk_size: int) -> None:
+    text = synth.export_text(MIXED).replace(", ", ",\r\n  ")
+    top_level_numbers = "[1500.0, 1.5e3, -2e-2, 7]"
+
+    assert [value for _, value in _scan(text, chunk_size)] == MIXED
+    assert [value for _, value in _scan(top_level_numbers, chunk_size)] == [1500.0, 1.5e3, -2e-2, 7]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[" + "9" * 5000 + "]",
+        "[" + "[" * 200_000 + "]" * 200_000 + "]",
+        "[{}] trailing",
+        "[{}] [{}]",
+    ],
+    ids=["huge integer", "deep nesting", "trailing text", "two arrays"],
+)
+def test_malformed_exports_fail_as_boundary_errors(text: str) -> None:
+    _scan_until_failure(text, chunk_size=64 * 1024)
+
+
+class _CountingStream(io.StringIO):
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self.consumed = 0
+
+    def read(self, size: int | None = -1) -> str:
+        chunk = super().read(size)
+        self.consumed += len(chunk)
+        return chunk
+
+
+def test_garbage_fails_without_reading_the_rest_of_the_file() -> None:
+    stream = _CountingStream("[" + "x" * (8 * 1024 * 1024) + "]")
+
+    with pytest.raises(SourceFormatError):
+        list(RecordScanner(stream, chunk_size=64 * 1024))
+
+    assert stream.consumed < 256 * 1024
+
+
 def test_a_large_record_costs_logarithmically_many_decode_attempts() -> None:
     attempts = 0
     decoder = json.JSONDecoder()

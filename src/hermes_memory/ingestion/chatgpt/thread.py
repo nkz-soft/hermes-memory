@@ -46,6 +46,8 @@ def _children(node: Mapping[str, Any]) -> list[str]:
     children = node.get("children", [])
     if not isinstance(children, list) or not all(isinstance(child, str) for child in children):
         raise UnreadableRecord("a node's children are not a list of node ids")
+    if len(set(children)) != len(children):
+        raise UnreadableRecord("a node lists the same child twice")
     return children
 
 
