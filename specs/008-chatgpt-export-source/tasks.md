@@ -262,18 +262,18 @@ reports 7 passed and 0 skipped.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T031 Write `tests/unit/test_chatgpt_streaming.py` and observe it pass only with streaming in
+- [X] T031 Write `tests/unit/test_chatgpt_streaming.py` and observe it pass only with streaming in
       place (research R3, SC-007, CG-14). With `tracemalloc`, the peak while fully iterating a
       synthesized export of 200 conversations and of 2,000 conversations, each of comparable size,
       differs by less than a factor of 3. Mark nothing as slow unless the whole unit suite exceeds
       its current duration by more than 10 seconds. To confirm the test bites, temporarily swap the
       scanner for `json.load` and observe it fail; do not commit that swap
-- [ ] T032 [P] Add `ingestion.chatgpt` to the `FILLED_BOUNDARIES` docstring in
+- [X] T032 [P] Add `ingestion.chatgpt` to the `FILLED_BOUNDARIES` docstring in
       `tests/structure/test_module_layout.py`, naming 008-chatgpt-export-source and stating that
       `ingestion` already covers it by prefix. No code change to the set
-- [ ] T033 [P] Update `src/hermes_memory/ingestion/__init__.py` docstring: #10's ChatGPT
+- [X] T033 [P] Update `src/hermes_memory/ingestion/__init__.py` docstring: #10's ChatGPT
       implementation lives in `ingestion.chatgpt` and is deliberately not re-exported here (T002)
-- [ ] T034 Run the whole [quickstart.md](./quickstart.md) sections 1–4
+- [X] T034 Run the whole [quickstart.md](./quickstart.md) sections 1–4
       (`uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`), and record the
       commands and results for the pull request
 

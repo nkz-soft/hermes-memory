@@ -7,9 +7,9 @@ The public surface this feature adds, and the behaviour it promises beyond #9's 
 ```python
 from hermes_memory.ingestion.chatgpt import ChatGPTExportSource
 
-source = ChatGPTExportSource(path)   # a .zip archive, a directory, or a conversations JSON file
-source.source                        # Source.CHATGPT
-source.read()                        # Iterator[SourceConversation]
+source = ChatGPTExportSource(path)  # a .zip archive, a directory, or a conversations JSON file
+source.source  # Source.CHATGPT
+source.read()  # Iterator[SourceConversation]
 ```
 
 The constructor does no I/O: it cannot fail on a missing path. Each call to `read()` opens the export

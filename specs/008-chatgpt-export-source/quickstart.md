@@ -15,7 +15,7 @@ uv sync
 uv run pytest tests/contracts/test_chatgpt_source_passes_the_contract.py -v -rs
 ```
 
-Expected: 7 passed, 0 skipped.
+Expected: 9 passed, 0 skipped: the seven rules CS-1 to CS-7, a check that no hook would skip one, and a round trip.
 
 ## 2. The parser's own behaviour (FR-023)
 
