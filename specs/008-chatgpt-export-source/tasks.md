@@ -139,7 +139,7 @@ threads.
 **Independent Test**: a synthesized conversation with known id, title, times and one untimed
 message maps exactly, and no time equals the controlled clock.
 
-- [ ] T016 [P] [US2] Extend `tests/unit/test_chatgpt_conversation.py` first and observe it fail. The
+- [X] T016 [P] [US2] Extend `tests/unit/test_chatgpt_conversation.py` first and observe it fail. The
       identifier is `conversation_id`, falling back to `id`, and `document_id == "chatgpt:" + id`
       (CG-4). `create_time`/`update_time` floats become UTC-aware datetimes. A message with
       `create_time: null` keeps `sent_at is None` in place. A missing or null title gives `title is
@@ -148,14 +148,14 @@ message maps exactly, and no time equals the controlled clock.
       `update_time < create_time` → `last_activity_at is None` with `inconsistent_times` set
       (research R7). With `datetime` patched in the module to a sentinel clock, no yielded time
       equals it (SC-006). An empty conversation (only a root node) is yielded with `messages == ()`
-- [ ] T017 [US2] Implement identity and time mapping in
+- [X] T017 [US2] Implement identity and time mapping in
       `src/hermes_memory/ingestion/chatgpt/conversation.py`, using
       `datetime.fromtimestamp(value, UTC)` and never reading a clock (research R7). Makes T016 pass
-- [ ] T018 [P] [US2] Extend `tests/unit/test_chatgpt_source.py` first and observe it fail. Each
+- [X] T018 [P] [US2] Extend `tests/unit/test_chatgpt_source.py` first and observe it fail. Each
       `original.content` equals the record's exact bytes in the written file, encoded as UTF-8, and
       `media_type == "application/json"`. Parsing `original.content` alone through `parse_record`
       yields an equal conversation for every fixture in this file (CG-10, research R8)
-- [ ] T019 [US2] Build `OriginalPayload` from `ExportRecord.raw` in
+- [X] T019 [US2] Build `OriginalPayload` from `ExportRecord.raw` in
       `src/hermes_memory/ingestion/chatgpt/source.py`. Makes T018 pass
 
 **Checkpoint**: US1 + US2 give correct turns with correct identity and time.

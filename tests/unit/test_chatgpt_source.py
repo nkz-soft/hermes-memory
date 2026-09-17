@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from hermes_memory.ingestion import SourceConversation
 from hermes_memory.ingestion.chatgpt import ChatGPTExportSource
+from hermes_memory.ingestion.chatgpt.conversation import parse_record
 from hermes_memory.normalization import Source
 from tests.synthetic import chatgpt_export as synth
 
@@ -48,6 +50,27 @@ def test_a_split_export_reads_as_one(tmp_path: Path) -> None:
     read = list(ChatGPTExportSource(tmp_path / "export").read())
 
     assert [one.conversation.source_id for one in read] == [f"conv-{i}" for i in range(5)]
+
+
+def test_each_original_is_the_records_exact_text(tmp_path: Path) -> None:
+    records = _records()
+    records[1]["title"] = 'Кириллица, emoji 🚀 and "quotes"'
+    synth.write_directory(tmp_path / "export", records)
+
+    read = list(ChatGPTExportSource(tmp_path / "export").read())
+
+    assert [one.original.content for one in read] == [
+        synth.serialize(one).encode("utf-8") for one in records
+    ]
+    assert all(one.original.media_type == "application/json" for one in read)
+
+
+def test_an_original_alone_parses_to_the_same_conversation(tmp_path: Path) -> None:
+    synth.write_zip(tmp_path / "export.zip", _records())
+
+    for one in ChatGPTExportSource(tmp_path / "export.zip").read():
+        reparsed = parse_record(json.loads(one.original.content))
+        assert reparsed.conversation == one.conversation
 
 
 def test_reading_twice_yields_equal_results(tmp_path: Path) -> None:
