@@ -40,7 +40,7 @@ afresh, which is why reading twice yields equal results (CS-4). Nothing else in
 `chatgpt.conversation.read`, at `info`, one per yielded conversation:
 
 ```text
-source_id, turns, folded_tool_results, structural, hidden, hidden_reasoning, abandoned_branch,
+source_id, nodes, turns, folded_tool_results, structural, hidden, hidden_reasoning, abandoned_branch,
 fallback_branch, start_from_messages, inconsistent_times, unrecognized_content_types
 ```
 

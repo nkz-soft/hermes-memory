@@ -170,7 +170,7 @@ without content.
 **Independent Test**: a conversation with a hidden node, an abandoned branch, a tool call with its
 result, an image and an unknown type produces the expected turns, markers and counts.
 
-- [ ] T020 [P] [US3] Extend `tests/unit/test_chatgpt_content.py` first and observe it fail: one test
+- [X] T020 [P] [US3] Extend `tests/unit/test_chatgpt_content.py` first and observe it fail: one test
       per row of the research R5 table. `multimodal_text` with string, image, audio,
       audio-transcription and unknown parts. `code`. `execution_output`. `tether_quote`.
       `tether_browsing_display`. `system_error`. `user_editable_context` visible and hidden.
@@ -178,36 +178,36 @@ result, an image and an unknown type produces the expected turns, markers and co
       keeps the message with empty text plus `NonTextPart(kind=OTHER, name=<type>)` and does not
       raise. `metadata.attachments` adds `FILE` markers with names. `is_visually_hidden_from_conversation`
       omits the node as `hidden`, whatever its type
-- [ ] T021 [US3] Implement the R5 table in `src/hermes_memory/ingestion/chatgpt/content.py`. Makes
+- [X] T021 [US3] Implement the R5 table in `src/hermes_memory/ingestion/chatgpt/content.py`. Makes
       T020 pass
-- [ ] T022 [P] [US3] Extend `tests/unit/test_chatgpt_content.py` with tool folding first and observe
+- [X] T022 [P] [US3] Extend `tests/unit/test_chatgpt_content.py` with tool folding first and observe
       it fail (research R6). An assistant message with `recipient="python"` followed by a `tool`
       message named `python` gives one assistant turn with `ToolActivity(name="python",
       request=<code>, result=<output>)` and no separate tool turn. A call with no following tool
       node keeps `result is None`. A call followed by a tool node of a different name keeps
       `result is None`, and that tool node stays a `TOOL` turn. A lone tool node stays a `TOOL` turn
-- [ ] T023 [US3] Implement `fold_turns(thread_messages) -> (tuple[Message, ...], folded_count)` in
+- [X] T023 [US3] Implement `fold_turns(thread_messages) -> (tuple[Message, ...], folded_count)` in
       `src/hermes_memory/ingestion/chatgpt/content.py`. Makes T022 pass
-- [ ] T024 [P] [US3] Write the `ThreadAccount` tests in `tests/unit/test_chatgpt_conversation.py`
+- [X] T024 [P] [US3] Write the `ThreadAccount` tests in `tests/unit/test_chatgpt_conversation.py`
       first and observe them fail. Constructing one whose counts do not sum to the mapping size
       raises. For each fixture in the file, `turns + folded_tool_results + structural + hidden +
       hidden_reasoning + abandoned_branch == len(mapping)` (SC-005).
       `unrecognized_content_types` is sorted and distinct. A conversation with nothing omitted has
       every omission count at zero and every flag false (FR-017)
-- [ ] T025 [US3] Implement `ThreadAccount` (frozen, fields exactly as data-model.md: `source_id`;
+- [X] T025 [US3] Implement `ThreadAccount` (frozen, fields exactly as data-model.md: `source_id`;
       `turns`, `folded_tool_results`, `structural`, `hidden`, `hidden_reasoning`,
       `abandoned_branch` as "`int` ≥ 0"; `fallback_branch`, `start_from_messages`,
       `inconsistent_times` as `bool`; `unrecognized_content_types: tuple[str, ...]` "sorted,
       distinct"; the sum invariant) and `ReadConversation(conversation, account)` in
       `src/hermes_memory/ingestion/chatgpt/conversation.py`, and have `parse_record` fill them.
       Makes T024 pass
-- [ ] T026 [P] [US3] Extend `tests/unit/test_chatgpt_source.py` first and observe it fail. Reading
+- [X] T026 [P] [US3] Extend `tests/unit/test_chatgpt_source.py` first and observe it fail. Reading
       emits exactly one `chatgpt.conversation.read` event per yielded conversation, carrying the
       fields of contracts/chatgpt-source.md, with `unrecognized_content_types` omitted when empty.
       Capture events with `structlog.testing.capture_logs`. Over a fixture whose title and texts
       contain a unique marker string, no captured event contains that marker anywhere (CG-9,
       Principle V)
-- [ ] T027 [US3] Emit the event via `hermes_memory.observability.get_logger` in
+- [X] T027 [US3] Emit the event via `hermes_memory.observability.get_logger` in
       `src/hermes_memory/ingestion/chatgpt/source.py` (research R9). Makes T026 pass
 
 **Checkpoint**: every node is accounted for, and the log is content-free.

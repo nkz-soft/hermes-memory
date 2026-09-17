@@ -34,6 +34,7 @@ What reconstruction did with every node of one conversation (FR-016, SC-005). Fr
 | Field | Type | Rule |
 |---|---|---|
 | `source_id` | `str` | the conversation's native id |
+| `nodes` | `int` | the size of the mapping; what the counts below must add up to |
 | `turns` | `int` ≥ 0 | nodes that became a `Message` |
 | `folded_tool_results` | `int` ≥ 0 | tool nodes folded into a call's `ToolActivity` (R6) |
 | `structural` | `int` ≥ 0 | nodes with no message |

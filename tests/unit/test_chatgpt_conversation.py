@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from hermes_memory.ingestion.chatgpt.conversation import parse_record
+from hermes_memory.ingestion.chatgpt.conversation import ThreadAccount, parse_record
 from hermes_memory.ingestion.chatgpt.thread import UnreadableRecord
 from hermes_memory.normalization import Message, Role, Source
 from tests.synthetic import chatgpt_export as synth
@@ -157,6 +157,85 @@ def test_an_empty_conversation_is_yielded_with_no_messages() -> None:
     record = synth.record("c", {"root": synth.node("root")}, "root")
 
     assert _read(record).conversation.messages == ()
+
+
+def _everything() -> synth.Record:
+    """A record exercising every omission reason, a fold, and an unrecognized type.
+
+    root ── sys(hidden) ── u1 ─┬─ a_old (abandoned) ── a_old_tail (abandoned)
+                               └─ think ── call ── out ── answer ── odd
+    """
+    code = {"content_type": "code", "text": "2 + 2"}
+    output = {"content_type": "execution_output", "text": "4"}
+    order = [
+        ("root", None, ["sys"]),
+        ("sys", say("system", "custom instructions", hidden=True), ["u1"]),
+        ("u1", say("user", "add numbers"), ["a_old", "think"]),
+        ("a_old", say("assistant", "abandoned"), ["a_old_tail"]),
+        ("a_old_tail", say("user", "abandoned too"), []),
+        ("think", say("assistant", content={"content_type": "thoughts", "thoughts": []}), ["call"]),
+        ("call", say("assistant", content=code, recipient="python"), ["out"]),
+        ("out", say("tool", content=output, author_name="python"), ["answer"]),
+        ("answer", say("assistant", "It is 4."), ["odd"]),
+        ("odd", say("assistant", content={"content_type": "novel_widget"}), []),
+    ]
+    parents = {child: parent for parent, _, children in order for child in children}
+    mapping = {
+        node_id: synth.node(node_id, body, parent=parents.get(node_id), children=children)
+        for node_id, body, children in order
+    }
+    return synth.record("everything", mapping, "odd")
+
+
+def test_every_node_is_accounted_for() -> None:
+    read = _read(_everything())
+    account = read.account
+
+    assert account == ThreadAccount(
+        source_id="everything",
+        nodes=10,
+        turns=4,
+        folded_tool_results=1,
+        structural=1,
+        hidden=1,
+        hidden_reasoning=1,
+        abandoned_branch=2,
+        unrecognized_content_types=("novel_widget",),
+    )
+    assert [turn.role for turn in read.conversation.messages] == [
+        Role.USER,
+        Role.ASSISTANT,
+        Role.ASSISTANT,
+        Role.ASSISTANT,
+    ]
+
+
+def test_a_plain_conversation_records_nothing_omitted_but_its_root() -> None:
+    account = _read(synth.linear_record("c", say("user", "a"), say("assistant", "b"))).account
+
+    assert (account.hidden, account.hidden_reasoning, account.abandoned_branch) == (0, 0, 0)
+    assert account.folded_tool_results == 0
+    assert account.structural == 1
+    assert not (
+        account.fallback_branch or account.start_from_messages or account.inconsistent_times
+    )
+    assert account.unrecognized_content_types == ()
+
+
+def test_an_account_that_does_not_add_up_is_refused() -> None:
+    with pytest.raises(ValueError, match="accounts for"):
+        ThreadAccount(source_id="c", nodes=3, turns=1)
+
+
+def test_unrecognized_types_are_sorted_and_distinct() -> None:
+    record = synth.linear_record(
+        "c",
+        say("assistant", content={"content_type": "zeta"}),
+        say("assistant", content={"content_type": "alpha"}),
+        say("assistant", content={"content_type": "zeta"}),
+    )
+
+    assert _read(record).account.unrecognized_content_types == ("alpha", "zeta")
 
 
 def test_no_clock_is_read(monkeypatch: pytest.MonkeyPatch) -> None:

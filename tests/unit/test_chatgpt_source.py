@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from structlog.testing import capture_logs
 
 from hermes_memory.ingestion import SourceConversation
 from hermes_memory.ingestion.chatgpt import ChatGPTExportSource
@@ -71,6 +72,39 @@ def test_an_original_alone_parses_to_the_same_conversation(tmp_path: Path) -> No
     for one in ChatGPTExportSource(tmp_path / "export.zip").read():
         reparsed = parse_record(json.loads(one.original.content))
         assert reparsed.conversation == one.conversation
+
+
+MARKER = "zq-unique-marker-4471"
+
+
+def test_one_content_free_event_is_logged_per_conversation(tmp_path: Path) -> None:
+    records = _records(2)
+    records[0]["title"] = f"title {MARKER}"
+    records[1]["mapping"]["n1"]["message"]["content"] = {"content_type": "novel", "x": MARKER}
+    synth.write_directory(tmp_path / "export", records)
+
+    with capture_logs() as events:
+        read = list(ChatGPTExportSource(tmp_path / "export").read())
+
+    logged = [event for event in events if event["event"] == "chatgpt.conversation.read"]
+    assert len(logged) == len(read) == 2
+    assert logged[0] == {
+        "event": "chatgpt.conversation.read",
+        "log_level": "info",
+        "source_id": "conv-0",
+        "nodes": 3,
+        "turns": 2,
+        "folded_tool_results": 0,
+        "structural": 1,
+        "hidden": 0,
+        "hidden_reasoning": 0,
+        "abandoned_branch": 0,
+        "fallback_branch": False,
+        "start_from_messages": False,
+        "inconsistent_times": False,
+    }
+    assert logged[1]["unrecognized_content_types"] == ["novel"]
+    assert MARKER not in repr(events)
 
 
 def test_reading_twice_yields_equal_results(tmp_path: Path) -> None:

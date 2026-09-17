@@ -22,10 +22,13 @@ from hermes_memory.ingestion.chatgpt.records import ExportRecord, RecordScanner
 from hermes_memory.ingestion.chatgpt.thread import UnreadableRecord
 from hermes_memory.ingestion.source import SourceConversation, SourceFormatError
 from hermes_memory.normalization import Source
+from hermes_memory.observability import get_logger
 
 __all__ = ["ChatGPTExportSource"]
 
 MEDIA_TYPE = "application/json"
+
+_log = get_logger(__name__)
 
 
 class _Reader(Iterator[SourceConversation]):
@@ -68,6 +71,7 @@ class _Reader(Iterator[SourceConversation]):
             read = parse_record(record.value)
         except UnreadableRecord as unreadable:
             raise SourceFormatError(str(unreadable)) from unreadable
+        _log.info("chatgpt.conversation.read", **read.account.as_fields())
         return SourceConversation(
             conversation=read.conversation,
             original=OriginalPayload(content=record.raw.encode("utf-8"), media_type=MEDIA_TYPE),
