@@ -241,6 +241,10 @@ FILLED_BOUNDARIES = frozenset(
   name; no implementation of any boundary lives in ``src/`` (that is #10 through #16), and
   ``tests/structure/test_boundary_interfaces.py`` holds them to reaching neither Hindsight, HTTP
   nor storage.
+* ``ingestion.chatgpt`` — 008-chatgpt-export-source, the first implementation of a boundary: the
+  ChatGPT conversation source. No entry is added, because ``ingestion`` already fills it by dotted
+  prefix; ``tests/structure/test_chatgpt_source_imports.py`` holds it to the same forbidden list
+  and keeps ``hermes_memory.ingestion`` from re-exporting it.
 
 Entries are matched by **dotted prefix**, so ``memory.interface`` fills that module and leaves
 ``memory.hindsight`` guarded. Matching on the first segment — as this set did until

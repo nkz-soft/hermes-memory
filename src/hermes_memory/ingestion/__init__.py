@@ -5,6 +5,10 @@ Also the importer side of §17's idempotency — the record of what has already 
 
 Two of the six boundaries of ARCHITECTURE.md §8 are declared here; their implementations arrive
 with #10 (ChatGPT) and #14 (SQLite import state).
+
+The ChatGPT source lives in `hermes_memory.ingestion.chatgpt` and is deliberately not re-exported
+from here: importing the interface must not load an implementation
+(`tests/structure/test_chatgpt_source_imports.py`).
 """
 
 from hermes_memory.ingestion.source import (

@@ -65,6 +65,14 @@ targetRules = ["generic-api-key"]
 paths = ['''^specs/003-logging-telemetry-baseline/quickstart\.md$''']
 regexes = ['''hs-live-9f3c2a7e51b04d6f''']
 
+[[allowlists]]
+description = "008: an invented marker string the scanner test proves never reaches an error message; it is assigned to a variable named `secret`, which is all the generic rule matched"
+condition = "AND"
+regexTarget = "line"
+targetRules = ["generic-api-key"]
+paths = ['''^tests/unit/test_chatgpt_records\.py$''']
+regexes = ['''a-unique-marker-7f3a''']
+
 # 004: the negative control. This one is different in kind from the four above — it exists to be
 # found. Exempting it here keeps the repository scan green; CI scans that directory *directly*,
 # where this configuration is not consulted, and fails the build if the key is not detected. The
