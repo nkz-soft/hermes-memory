@@ -221,7 +221,7 @@ result, an image and an unknown type produces the expected turns, markers and co
 **Independent Test**: an export of three with the second malformed yields two and raises one;
 unreachable and non-export paths raise the right kind.
 
-- [ ] T028 [P] [US4] Extend `tests/unit/test_chatgpt_source.py` first and observe it fail. Three
+- [X] T028 [P] [US4] Extend `tests/unit/test_chatgpt_source.py` first and observe it fail. Three
       records with the second each of: not an object; no identifier; dangling parent; no time
       anywhere; a text part with an unpaired surrogate escape (a model `ValidationError`). Each
       case yields the first and third and raises exactly one `SourceFormatError` for the second,
@@ -232,7 +232,7 @@ unreachable and non-export paths raise the right kind.
       True`. For every raised error, the unique marker string placed in the record's title and
       text appears in neither `str(error)` nor `error.message` (CG-13), and the error is a
       `BoundaryError` (CS-7)
-- [ ] T029 [US4] Implement failure translation per the research R10 table in
+- [X] T029 [US4] Implement failure translation per the research R10 table in
       `src/hermes_memory/ingestion/chatgpt/conversation.py` and
       `src/hermes_memory/ingestion/chatgpt/source.py`: a seen-id set per `read()`; `ValidationError`
       rendered from `error["type"]` and `error["loc"]` only; every cause chained with `from`; after
@@ -249,7 +249,7 @@ unreachable and non-export paths raise the right kind.
 **Independent Test**: `uv run pytest tests/contracts/test_chatgpt_source_passes_the_contract.py -rs`
 reports 7 passed and 0 skipped.
 
-- [ ] T030 [US5] Write `tests/contracts/test_chatgpt_source_passes_the_contract.py` and run it:
+- [X] T030 [US5] Write `tests/contracts/test_chatgpt_source_passes_the_contract.py` and run it:
       `class TestChatGPTExportSource(ConversationSourceContract)`, with an autouse fixture storing
       `tmp_path` on the instance. `make_source` writes `from_conversation(...)` records with
       `write_directory`. `make_source_with_one_unreadable` gives the second record a dangling

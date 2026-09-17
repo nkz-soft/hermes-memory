@@ -11,9 +11,11 @@ reader is finished — there is nothing after it that could be found.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import TextIO
+
+from pydantic import ValidationError
 
 from hermes_memory.archive.interface import OriginalPayload
 from hermes_memory.ingestion.chatgpt.conversation import parse_record
@@ -31,9 +33,34 @@ MEDIA_TYPE = "application/json"
 _log = get_logger(__name__)
 
 
+def _identifier(value: object) -> str | None:
+    """The record's identifier for a failure's subject, where one can be found without parsing."""
+    if isinstance(value, Mapping):
+        for field in ("conversation_id", "id"):
+            candidate = value.get(field)
+            if isinstance(candidate, str) and candidate:
+                return candidate
+    return None
+
+
+def _describe(refused: ValidationError) -> str:
+    """Name what the model refused, and where — never the refused value (R10, Principle V).
+
+    Pydantic's own rendering quotes the input, and the input is conversation content.
+    """
+    problems = sorted(
+        {
+            f"{error['type']} at {'.'.join(str(part) for part in error['loc'])}"
+            for error in refused.errors()
+        }
+    )
+    return "the record does not fit the normalized model: " + "; ".join(problems)
+
+
 class _Reader(Iterator[SourceConversation]):
     def __init__(self, path: Path) -> None:
         self._path = path
+        self._seen: set[str] = set()
         self._export: Export | None = None
         self._names: Iterator[str] = iter(())
         self._stream: TextIO | None = None
@@ -67,10 +94,20 @@ class _Reader(Iterator[SourceConversation]):
             raise
 
     def _convert(self, record: ExportRecord) -> SourceConversation:
+        subject = _identifier(record.value)
         try:
             read = parse_record(record.value)
         except UnreadableRecord as unreadable:
-            raise SourceFormatError(str(unreadable)) from unreadable
+            raise SourceFormatError(str(unreadable), subject=subject) from unreadable
+        except ValidationError as refused:
+            raise SourceFormatError(_describe(refused), subject=subject) from refused
+
+        source_id = read.conversation.source_id
+        if source_id in self._seen:
+            raise SourceFormatError(
+                "a conversation identifier appears twice in the export", subject=source_id
+            )
+        self._seen.add(source_id)
         _log.info("chatgpt.conversation.read", **read.account.as_fields())
         return SourceConversation(
             conversation=read.conversation,
