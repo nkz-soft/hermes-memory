@@ -16,6 +16,7 @@ become the way one arrives.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
@@ -48,30 +49,90 @@ def find_spans(text: str, patterns: Sequence[Pattern]) -> list[Span]:
     """
     spans: list[Span] = []
     for precedence, pattern in enumerate(patterns):
-        if pattern.requires is not None and not pattern.requires.search(text):
-            continue
-        for match in pattern.expression.finditer(text):
-            value = match.group(pattern.value_group)
-            if value is None or len(value) < pattern.minimum_length or is_placeholder(value):
-                continue
-            start, end = match.span(pattern.value_group)
-            spans.append(Span(start, end, pattern.category, precedence))
+        regions = [(0, len(text))] if pattern.within is None else pattern.within(text)
+        for region_start, region_end in regions:
+            for match in pattern.expression.finditer(text, region_start, region_end):
+                value = match.group(pattern.value_group)
+                if value is None or len(value) < pattern.minimum_length or is_placeholder(value):
+                    continue
+                start, end = match.span(pattern.value_group)
+                if pattern.value_group != 0 and _is_a_code_expression(value):
+                    continue
+                spans.append(Span(start, end, pattern.category, precedence))
     return spans
+
+
+_CALL_OR_SUBSCRIPT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_.]*[(\[]")
+"""A name — possibly dotted — opening a call or a subscript: `os.getenv(`, `getApiKey(`, `env[`."""
+
+
+def _is_a_code_expression(value: str) -> bool:
+    """Whether the value is code rather than a literal.
+
+    `api_key = os.getenv("OPENAI_API_KEY")` and `const apiKey = getApiKey();` are the shapes this
+    exists for. Redacting them is worse than an ordinary false positive: the line comes out
+    syntactically broken, so the context §13 requires to survive does not.
+
+    Two conditions, because a password may contain brackets and recall wins that trade (research
+    R5). The value must *open* with a name applying a call or a subscript, and it must *end* on a
+    bracket — which is what an expression truncated at the first quote looks like:
+
+    | value | verdict |
+    |---|---|
+    | `os.getenv(` | code — a call cut off at its first argument |
+    | `getApiKey()` | code |
+    | `os.environ[` | code |
+    | `P@ssw0rd(1)` | a password; `@` is not part of a name |
+    | `Secret[42]xyz` | a password; it does not end on a bracket |
+    """
+    return _CALL_OR_SUBSCRIPT.match(value) is not None and value[-1] in "()[]"
 
 
 def resolve(spans: Iterable[Span]) -> list[Span]:
     """Drop every span that overlaps one already kept, most specific first (RR-6).
 
-    Sorted by precedence before position, so that the winner of an overlap is the more specific
-    pattern rather than whichever happened to start first. The result is re-sorted by position,
-    because the rewrite walks the string forwards.
+    Pattern by pattern, in table order, merging each pattern's spans into the ones already kept.
+    The merge is what keeps this linear: within one pattern the spans are already disjoint and in
+    order — `finditer` yields non-overlapping matches — and the kept list is disjoint and in order
+    by construction, so one walk of each settles every overlap between them.
+
+    The obvious version, asking `any(...)` over the kept list per span, is quadratic. It looks
+    harmless on a three-line fixture and costs seconds on a `.env` file with a few thousand lines,
+    which is a size real history reaches (research R12).
     """
+    by_pattern: dict[int, list[Span]] = {}
+    for span in spans:
+        by_pattern.setdefault(span.precedence, []).append(span)
+
     kept: list[Span] = []
-    for span in sorted(spans, key=lambda s: (s.precedence, s.start, -s.end)):
-        if any(span.start < other.end and other.start < span.end for other in kept):
+    for precedence in sorted(by_pattern):
+        incoming = sorted(by_pattern[precedence], key=lambda span: (span.start, -span.end))
+        kept = _merge(kept, incoming)
+    return kept
+
+
+def _merge(kept: list[Span], incoming: list[Span]) -> list[Span]:
+    """Merge one pattern's spans into the kept ones, dropping any that overlap.
+
+    Both lists are sorted by start. `kept` is disjoint by construction; `incoming` is disjoint
+    because `finditer` yields non-overlapping matches — but only per region, and a pattern's regions
+    come from a caller-supplied `within`. A callable returning two regions that overlap would hand
+    this function the same span twice, and the result would be `[REDACTED][REDACTED]` with the count
+    doubled. So overlap with what was just emitted is checked too, rather than assumed away.
+    """
+    merged: list[Span] = []
+    index = 0
+    for span in incoming:
+        while index < len(kept) and kept[index].end <= span.start:
+            merged.append(kept[index])
+            index += 1
+        if index < len(kept) and kept[index].start < span.end:
             continue
-        kept.append(span)
-    return sorted(kept)
+        if merged and merged[-1].end > span.start:
+            continue
+        merged.append(span)
+    merged.extend(kept[index:])
+    return merged
 
 
 def redact(text: str, patterns: Sequence[Pattern]) -> tuple[str, dict[RedactionCategory, int]]:

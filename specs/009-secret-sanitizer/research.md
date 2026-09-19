@@ -88,6 +88,13 @@ pattern also sees. Rewriting pattern by pattern would redact the region twice, c
 `[REDACTED]` itself. Resolving spans first makes "redacted once, counted once, under the more
 specific category" (FR-014) a property of the algorithm rather than of the pattern order's luck.
 
+**How resolution stays linear.** Spans are grouped by pattern and merged into the kept list in
+table order, one walk per pattern: within a pattern `finditer` yields non-overlapping matches in
+order, and the kept list is disjoint and in order by construction, so a single merge settles every
+overlap between them. The obvious version — asking `any(...)` over the kept list per span — is
+quadratic; it survived review of the first implementation because the cost suite's large fixture
+contained no matches at all, and it cost 11.6 seconds on one field of a 20 000-entry manifest.
+
 The precedence order, most specific first: private key block → vendor-prefixed keys (Anthropic
 before OpenAI, since `sk-ant-` is a prefix of the `sk-` family) → GitHub → GitLab → AWS access key
 id → JWT → Kubernetes secret → connection string → bearer token → API key → AWS secret access key →
@@ -132,12 +139,34 @@ which is next to its name.
 
 Both report under one category because §13 names one, and #9 fixed the vocabulary.
 
-## R7 — Kubernetes secrets: anchored on the manifest, not on base64
+## R7 — Kubernetes secrets: scoped to the Secret's own data block, not to the text
 
-**Decision**: within a text that contains `kind: Secret`, redact the values of entries under `data:`
-and `stringData:`. Additionally, redact the value of `--from-literal=<key>=<value>` in a
+**Decision**: for each `data:` or `stringData:` key, ask whether the mapping *it belongs to* declares
+`kind: Secret` — its siblings at the same indent, bounded by a `---`, by a list item's start and by
+any line indented less — and if so redact the values in its block. Additionally, redact the value of `--from-literal=<key>=<value>` in a
 `kubectl create secret` command line. Everything else in the manifest — the kind, the metadata, the
 keys — is kept.
+
+**Revised twice during implementation, both times because review probed a shape the fixtures did
+not have.** It is worth recording the two wrong answers, because each looked right:
+
+1. **"The text contains `kind: Secret`"**, with the pattern matching any indented `key: value` line.
+   It redacted the Secret's own `metadata:` values and, in a multi-document YAML, the ConfigMap in
+   the document beside it — what RC-13's "Kept" and "Must not match" clauses forbid in as many
+   words.
+2. **"`kind: Secret` at column 0, in the same `---` document."** It missed the shape most likely to
+   reach a conversation at all: `kubectl get secrets -o yaml` wraps every Secret in a `v1/List` and
+   indents its `kind` by two columns, so a `token:` in a real listing went through unredacted —
+   strictly worse than the version it replaced. It also missed every CRLF manifest, because the
+   anchors ended `[ \t]*$` and `\r` is in neither class.
+
+The third answer asks the question of the enclosing mapping, which is what YAML actually means by
+"this Secret's data". It is computed in code, line by line, because neither relation — *my* mapping,
+*my* document — fits in a lookbehind, and because a line-by-line parse is where `\r`, a `- ` list
+marker, a quoted `kind` and a trailing comment can each be handled in one place. Scoping it this way
+also let the value alphabet widen, which is what made `stringData:` values with hyphens work, and it
+makes the regions disjoint: a `data:` nested under another key has different siblings, so it is not a
+Secret's block and cannot produce a second region inside the first.
 
 **Rationale**: the thing that makes a base64 line a secret is the manifest around it, so the
 manifest is what the pattern anchors on. Redacting `data:` values in any YAML would empty

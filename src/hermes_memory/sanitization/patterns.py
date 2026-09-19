@@ -23,11 +23,12 @@ to be, which is a quieter version of the failure §13 rejects.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from hermes_memory.sanitization.sanitizer import RedactionCategory
 
-__all__ = ["PATTERNS", "Pattern", "is_placeholder"]
+__all__ = ["PATTERNS", "Pattern", "is_placeholder", "secret_manifest_blocks"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,12 +47,14 @@ class Pattern:
     minimum_length: int = 1
     """Below this, a matched value is treated as a placeholder rather than a credential."""
 
-    requires: re.Pattern[str] | None = None
-    """A guard the surrounding text must satisfy before this pattern applies at all.
+    within: Callable[[str], list[tuple[int, int]]] | None = None
+    """The regions of a text this pattern may match in. `None` means the whole of it.
 
-    It exists for one category: what makes a base64 line a Kubernetes secret is the `kind: Secret`
-    above it, and a regular expression cannot look arbitrarily far behind its own match. Without the
-    guard the same pattern would empty every ConfigMap quoted in a conversation (research R7).
+    It exists for one category. What makes a line a Kubernetes secret is the `kind: Secret` above
+    it and the `data:` key it sits under, and a regular expression cannot look arbitrarily far
+    behind its own match. A guard that merely required `kind: Secret` *somewhere* would redact the
+    manifest's own metadata and, in a multi-document YAML, the ConfigMap beside it — which RC-13
+    forbids in as many words (research R7).
     """
 
 
@@ -74,9 +77,34 @@ _PLACEHOLDERS = frozenset(
         "value",
         "your-key",
         "yourkey",
+        # Type names, because `password: string;` appears in every type declaration an engineering
+        # history quotes, and `password` there is a field name rather than a credential.
+        "any",
+        "bool",
+        "boolean",
+        "bytes",
+        "char",
+        "float",
+        "int",
+        "integer",
+        "nullable",
+        "number",
+        "object",
+        "optional",
+        "required",
+        "str",
+        "string",
+        "text",
+        "true",
+        "false",
+        "uuid",
+        "varchar",
     }
 )
-"""Values that are the *name* of a secret rather than one. Compared case-insensitively."""
+"""Values that are the *name* of a secret, or the type of one, rather than a secret.
+
+Compared case-insensitively, after quotes and a trailing `;` or `,` are stripped.
+"""
 
 _REFERENCE = re.compile(
     r"""
@@ -99,9 +127,10 @@ def is_placeholder(value: str) -> bool:
     These shapes are what a README line, an example `curl` and a quoted docker-compose file are made
     of, and the corpus is full of them. Redacting one protects nothing and costs a sentence.
 
-    Quotes are stripped first, because a `.env` line writes its placeholder as `"<your-token>"`.
+    Quotes are stripped first, because a `.env` line writes its placeholder as `"<your-token>"`,
+    and a trailing `;` or `,` because a type declaration writes `password: string;`.
     """
-    stripped = value.strip().strip("\"'")
+    stripped = value.strip().strip("\"'").rstrip(";,")
     return (
         not stripped or stripped.lower() in _PLACEHOLDERS or _REFERENCE.match(stripped) is not None
     )
@@ -109,6 +138,137 @@ def is_placeholder(value: str) -> bool:
 
 _VALUE = "value"
 """The group name every keyed and block pattern puts the credential in."""
+
+_DOCUMENT_SEPARATOR = re.compile(r"\A---(?:[ \t].*)?\Z")
+_KEY = re.compile(r"\A(?P<key>[A-Za-z_][A-Za-z0-9._-]{0,64})[ \t]*:(?P<rest>.*)\Z")
+_SECRET_VALUE = re.compile(r"\A[ \t]*[\"']?Secret[\"']?[ \t]*(?:#.*)?\Z")
+_EMPTY_VALUE = re.compile(r"\A[ \t]*(?:#.*)?\Z")
+_DATA_KEYS = frozenset({"data", "stringData"})
+
+
+@dataclass(frozen=True, slots=True)
+class _Line:
+    """One line of a manifest, parsed just enough to answer the two questions that matter."""
+
+    start: int
+    end: int
+    """Offsets into the whole text, `end` excluding the line break."""
+
+    indent: int
+    """Where the line's content begins, counting a `- ` list marker as two columns of indent."""
+
+    key: str | None
+    value: str
+    is_item_start: bool
+    """Whether this line opens a list item, which is where one mapping ends and the next begins."""
+
+    is_separator: bool
+    is_blank: bool
+
+
+def secret_manifest_blocks(text: str) -> list[tuple[int, int]]:
+    """The `data:` and `stringData:` blocks of the Kubernetes Secrets in a text, as offsets.
+
+    Written as code rather than as a regular expression because the condition is not local: a value
+    is a secret when the mapping *it* belongs to declares `kind: Secret`. Neither relation fits in a
+    lookbehind, and the cheap approximations are both wrong in ways a review caught:
+
+    * "the text contains `kind: Secret`" takes the manifest's own metadata with it, and in a
+      multi-document YAML the ConfigMap in the document beside it.
+    * "`kind: Secret` at column 0, in the same `---` document" misses the shape most likely to
+      reach a conversation at all — `kubectl get secrets -o yaml`, which wraps every Secret in a
+      `v1/List` and indents its `kind` by two columns.
+
+    So the question is asked of the enclosing mapping: for a `data:` key, look at the lines that are
+    its siblings — same indent, same mapping, bounded by a `---`, by a list item's start and by any
+    line indented less — and see whether one of them is `kind: Secret`. A `data:` nested under
+    another key has different siblings and is therefore not a Secret's data block, which is also
+    what keeps the blocks disjoint.
+    """
+    lines = _parse(text)
+    blocks: list[tuple[int, int]] = []
+    for index, line in enumerate(lines):
+        if line.key not in _DATA_KEYS or not _EMPTY_VALUE.match(line.value):
+            continue
+        if not _enclosing_mapping_is_a_secret(lines, index):
+            continue
+        blocks.append((line.end, _block_end(lines, index)))
+    return blocks
+
+
+def _parse(text: str) -> list[_Line]:
+    parsed: list[_Line] = []
+    position = 0
+    for raw in text.splitlines(keepends=True):
+        content = raw.rstrip("\r\n")
+        stripped = content.lstrip(" \t")
+        indent = len(content[: len(content) - len(stripped)].expandtabs(8))
+        is_item_start = stripped.startswith("- ") or stripped == "-"
+        if is_item_start:
+            # `- kind: Secret` is a mapping whose first key sits two columns in, and the dash is
+            # where the previous item's mapping ends.
+            indent += 2
+            stripped = stripped[2:].lstrip(" \t")
+        key_match = _KEY.match(stripped)
+        parsed.append(
+            _Line(
+                start=position,
+                end=position + len(content),
+                indent=indent,
+                key=key_match.group("key") if key_match else None,
+                value=key_match.group("rest") if key_match else stripped,
+                is_item_start=is_item_start,
+                is_separator=_DOCUMENT_SEPARATOR.match(stripped) is not None,
+                is_blank=not stripped,
+            )
+        )
+        position += len(raw)
+    return parsed
+
+
+def _enclosing_mapping_is_a_secret(lines: list[_Line], index: int) -> bool:
+    """Whether a sibling of `lines[index]` says `kind: Secret`."""
+    indent = lines[index].indent
+    return any(
+        line.key == "kind" and _SECRET_VALUE.match(line.value)
+        for line in _siblings(lines, index, indent)
+    )
+
+
+def _siblings(lines: list[_Line], index: int, indent: int) -> list[_Line]:
+    """The lines of the same mapping as `lines[index]`, above and below it."""
+    siblings: list[_Line] = []
+    for line in reversed(lines[:index]):
+        if line.is_blank:
+            continue
+        if line.is_separator or line.indent < indent:
+            break
+        if line.indent == indent:
+            siblings.append(line)
+        if line.is_item_start:
+            break
+    for line in lines[index + 1 :]:
+        if line.is_blank:
+            continue
+        if line.is_separator or line.indent < indent or line.is_item_start:
+            break
+        if line.indent == indent:
+            siblings.append(line)
+    return siblings
+
+
+def _block_end(lines: list[_Line], index: int) -> int:
+    """Where the mapping under a `data:` key stops: the first line no more indented than the key."""
+    indent = lines[index].indent
+    end = lines[index].end
+    for line in lines[index + 1 :]:
+        if line.is_blank:
+            continue
+        if line.is_separator or line.indent <= indent:
+            break
+        end = line.end
+    return end
+
 
 PATTERNS: tuple[Pattern, ...] = (
     # --- delimited block ---------------------------------------------------------------------
@@ -156,18 +316,19 @@ PATTERNS: tuple[Pattern, ...] = (
         ),
     ),
     # --- keyed ---------------------------------------------------------------------------------
-    # What makes a base64 line a secret is the manifest around it, so the manifest is the guard.
-    # The value alphabet excludes `-`, which is what keeps `name: hermes-importer` out of it, and
-    # the minimum length is what keeps `kind: Secret` itself out (research R7).
+    # Confined to the `data:` and `stringData:` blocks of an actual Secret, so the manifest's own
+    # metadata and the ConfigMap in the document beside it are untouched (RC-13). Inside that block
+    # every value is a credential, which is what lets the alphabet be permissive enough for a
+    # `stringData:` value with hyphens in it.
     Pattern(
         category=RedactionCategory.KUBERNETES_SECRET,
         expression=re.compile(
-            r"^[ \t]{1,16}[A-Za-z0-9._-]{1,64}:[ \t]{0,8}(?P<value>[A-Za-z0-9+/=]{12,4096})[ \t]*$",
+            r"^[ \t]{1,16}[A-Za-z0-9._-]{1,64}:[ \t]{0,8}(?P<value>[^\s\"']{4,4096})[ \t]*\r?$",
             re.MULTILINE,
         ),
         value_group=_VALUE,
-        minimum_length=12,
-        requires=re.compile(r"kind:[ \t]{0,8}Secret\b"),
+        minimum_length=4,
+        within=secret_manifest_blocks,
     ),
     Pattern(
         category=RedactionCategory.KUBERNETES_SECRET,
@@ -203,10 +364,21 @@ PATTERNS: tuple[Pattern, ...] = (
         value_group=_VALUE,
         minimum_length=8,
     ),
+    # `access_token` and `refresh_token` are bearer tokens by another spelling, and they are the
+    # spelling a real history carries: an OAuth response, a `gcloud` dump, a Docker config.
+    Pattern(
+        category=RedactionCategory.BEARER_TOKEN,
+        expression=re.compile(
+            r"(?i:access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token)[\"']?"
+            r"[ \t]*[:=][ \t]*[\"']?(?P<value>[^\s\"',;&]{8,4096})"
+        ),
+        value_group=_VALUE,
+        minimum_length=8,
+    ),
     Pattern(
         category=RedactionCategory.API_KEY,
         expression=re.compile(
-            r"(?i:api[_-]?key|apikey|api[_-]?secret)[\"']?[ \t]*[:=][ \t]*"
+            r"(?i:api[_-]?key|apikey|api[_-]?secret|client[_-]?secret)[\"']?[ \t]*[:=][ \t]*"
             r"[\"']?(?P<value>[^\s\"',;&]{8,512})"
         ),
         value_group=_VALUE,
@@ -226,7 +398,8 @@ PATTERNS: tuple[Pattern, ...] = (
     Pattern(
         category=RedactionCategory.PASSWORD,
         expression=re.compile(
-            r"(?i:password|passwd|pwd)[\"']?[ \t]*[:=][ \t]*[\"']?(?P<value>[^\s\"',;]{4,256})"
+            r"(?i:password|passwd|pwd)[\"']?[ \t]*[:=][ \t]*"
+            r"[\"']?(?P<value>[^\s\"',;]{4,256})"
         ),
         value_group=_VALUE,
         minimum_length=4,
@@ -242,7 +415,8 @@ PATTERNS: tuple[Pattern, ...] = (
         category=RedactionCategory.DOTENV_VALUE,
         expression=re.compile(
             r"^[ \t]{0,8}(?:export[ \t]+)?"
-            r"[A-Z][A-Z0-9_]{0,63}(?:_TOKEN|_SECRET|_KEY|_PASSWORD|_PASS|_CREDENTIALS)"
+            r"(?:[A-Z][A-Z0-9_]{0,63}(?:_TOKEN|_SECRET|_KEY|_PASSWORD|_PASS|_CREDENTIALS)"
+            r"|TOKEN|SECRET|PASSWORD)"
             r"[ \t]*=[ \t]*[\"']?(?P<value>[^\s\"']{6,512})",
             re.MULTILINE,
         ),

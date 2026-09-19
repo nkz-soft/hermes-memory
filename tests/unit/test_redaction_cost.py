@@ -21,6 +21,10 @@ from hermes_memory.sanitization.scanner import redact
 
 HOSTILE = (
     "-----BEGIN OPENSSH " * 400
+    # A *complete* marker with no `END` after it, repeated: the shape that makes the block pattern
+    # search forward to the end of the text and find nothing, once per marker. Without this the
+    # PEM pattern is never stressed, because a match never starts (review of PR for #11).
+    + ("-----BEGIN RSA PRIVATE KEY-----\nAAAABBBBCCCC\n" * 400)
     + "sk-" * 2000
     + "eyJ"
     + "a" * 4000
@@ -29,6 +33,18 @@ HOSTILE = (
     + "://" * 2000
 )
 """Prefixes and separators the table looks for, repeated, with nothing that completes a match."""
+
+
+def many_matches(lines: int) -> str:
+    """A `.env` file whose every line is a credential — thousands of spans to resolve, not to find.
+
+    The cost of *resolving* spans is invisible to a text with no matches in it, which is what the
+    large-manifest case below is. Resolution was quadratic and this suite could not see it.
+    """
+    return "".join(
+        f"SERVICE{index}_TOKEN=abcdefghijklmnopqrstuvwxyz012345\n" for index in range(lines)
+    )
+
 
 LARGE_TOOL_RESULT = "apiVersion: v1\nkind: ConfigMap\ndata:\n" + "".join(
     f"  key-{index}: value-{index}\n" for index in range(8000)
@@ -81,3 +97,24 @@ def test_cost_grows_with_the_text_rather_than_with_its_square() -> None:
     large_cost = time.perf_counter() - started
 
     assert large_cost < max(small_cost, 0.001) * 25
+
+
+def test_cost_grows_with_the_number_of_redactions_rather_than_its_square() -> None:
+    """The same claim where it was actually false: thousands of spans, all of them kept.
+
+    Eight times the credentials cost sixty-four times the work while `resolve` asked `any(...)`
+    over everything it had kept. A field of this size is an ordinary `.env` quoted into a chat.
+    """
+    sanitizer = PatternSecretSanitizer()
+
+    started = time.perf_counter()
+    _, small_report = sanitizer.redact_text(many_matches(1000))
+    small_cost = time.perf_counter() - started
+
+    started = time.perf_counter()
+    _, large_report = sanitizer.redact_text(many_matches(8000))
+    large_cost = time.perf_counter() - started
+
+    assert small_report.total == 1000
+    assert large_report.total == 8000
+    assert large_cost < max(small_cost, 0.001) * 20

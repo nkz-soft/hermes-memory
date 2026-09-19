@@ -162,13 +162,31 @@ SAMPLES: tuple[Sample, ...] = (
         value=_K8S,
         sentence=(
             "apiVersion: v1\n"
+            "kind: ConfigMap\n"
+            "metadata:\n"
+            "  name: hermesimporter\n"
+            "data:\n"
+            "  logLevel: aW5mbw==\n"
+            "---\n"
+            "apiVersion: v1\n"
             "kind: Secret\n"
             "metadata:\n"
-            "  name: hermes-importer\n"
+            "  name: hermesimporter\n"
+            "  namespace: productionenv\n"
             "data:\n"
             f"  api-token: {_K8S}\n"
         ),
-        kept=("kind: Secret", "name: hermes-importer", "api-token:"),
+        # The metadata carries no hyphen and the ConfigMap sits in the same text on purpose: both
+        # are what a guard anchored on "the text mentions kind: Secret" would take with it, and a
+        # fixture without them lets that mistake pass (review of PR for #11).
+        kept=(
+            "kind: ConfigMap",
+            "logLevel: aW5mbw==",
+            "kind: Secret",
+            "name: hermesimporter",
+            "namespace: productionenv",
+            "api-token:",
+        ),
     ),
 )
 

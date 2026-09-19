@@ -30,15 +30,22 @@ One entry in the table.
 | `expression` | the compiled expression; every quantifier bounded, none nested (research R2) |
 | `value_group` | which group holds the value to replace — the whole match for a value-shaped pattern, a named group for a keyed one or a block body |
 | `minimum_length` | below which a matched value is treated as a placeholder (RR-7) |
-| `requires` | an optional guard the surrounding text must satisfy before the pattern applies |
+| `within` | the regions of a text the pattern may match in; `None` means all of it |
 
 Precedence is **not** a field: it is the entry's position in the sequence handed to the scanner, so
 the table cannot disagree with itself about which of two patterns is the more specific (RR-6).
 
-`requires` exists for one category. What makes a base64 line a Kubernetes secret is the
-`kind: Secret` above it, and a regular expression cannot look arbitrarily far behind its own match;
-without the guard, the same pattern would empty every ConfigMap quoted in a conversation
-(research R7).
+`within` exists for one category. What makes a line a Kubernetes secret is the mapping it belongs to,
+and a regular expression cannot look arbitrarily far behind its own match.
+`secret_manifest_blocks` computes those regions line by line: for each `data:`/`stringData:` key,
+check whether its siblings — the lines of the same mapping — declare `kind: Secret`, and if so return
+its block. A guard that merely asked whether the text mentioned `kind: Secret` would redact the
+manifest's own metadata and the ConfigMap in the document beside it; one anchored at column 0 would
+miss the `v1/List` form `kubectl get secrets -o yaml` emits (research R7).
+
+**A `within` callable must return disjoint regions.** Two overlapping regions would hand the scanner
+the same match twice. `_merge` drops the duplicate rather than trusting the caller, because `within`
+is an extension point and the next callable will make the mistake this one made.
 
 **Rules**: the table is built once at import and is immutable. Two patterns may share a category —
 the AWS id and the AWS secret do (RC-8), and the vendor prefixes each have several spellings. No

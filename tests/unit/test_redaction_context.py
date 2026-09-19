@@ -84,9 +84,17 @@ def test_a_secret_manifest_keeps_its_kind_metadata_and_keys(
 
     assert redacted == (
         "apiVersion: v1\n"
+        "kind: ConfigMap\n"
+        "metadata:\n"
+        "  name: hermesimporter\n"
+        "data:\n"
+        "  logLevel: aW5mbw==\n"
+        "---\n"
+        "apiVersion: v1\n"
         "kind: Secret\n"
         "metadata:\n"
-        "  name: hermes-importer\n"
+        "  name: hermesimporter\n"
+        "  namespace: productionenv\n"
         "data:\n"
         f"  api-token: {REDACTED}\n"
     )

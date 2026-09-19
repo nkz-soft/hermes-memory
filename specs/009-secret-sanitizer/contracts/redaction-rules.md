@@ -38,8 +38,14 @@ password → `.env` value.
 
 **RR-7 — A placeholder is not a secret.** A keyed value is left alone when it is a variable
 reference (`$VAR`, `${VAR}`, `%VAR%`, `{{ var }}`), a documentation placeholder (`<your-api-key>`,
-`xxx`, `***`, `changeme`, `...`), empty, already `[REDACTED]`, or below the category's minimum
-length.
+`xxx`, `***`, `changeme`, `...`), a type name (`string`, `str`, `int`, `bool`, `varchar`, …),
+empty, already `[REDACTED]`, or below the category's minimum length.
+
+**RR-7a — Code is not a literal.** A keyed value that opens with a name applying a call or a
+subscript **and** ends on a bracket is code — `os.getenv(`, `getApiKey()`, `os.environ[` — and is
+left alone. Redacting one is worse than an ordinary false positive: the line comes out syntactically
+broken, so the context §13 requires to survive does not. Both halves of the test are needed, because
+`P@ssw0rd(1)` and `Secret[42]xyz` are passwords with brackets in them and recall wins that trade.
 
 **RR-8 — Sanitization is idempotent.** Sanitizing a sanitized conversation returns an equal
 conversation and an empty report.
@@ -53,11 +59,14 @@ machine.
 Each rule names what must be redacted and, where the shape invites a false positive, what must
 survive. The "kept" column is the assertion that distinguishes this feature from deleting content.
 
-**RC-1 — `api-key`.** Keyed: `api_key`, `apikey`, `api-key`, `x-api-key` as an assignment, a header
-or a query parameter. Redacted: the value. Kept: the key, the header name, and the rest of the URL.
+**RC-1 — `api-key`.** Keyed: `api_key`, `apikey`, `api-key`, `x-api-key`, `api_secret` and
+`client_secret` as an assignment, a header, a JSON member or a query parameter. Redacted: the value.
+Kept: the key, the header name, and the rest of the URL.
 
-**RC-2 — `bearer-token`.** Keyed: `Authorization: Bearer ‹token›`, and `PRIVATE-TOKEN: ‹token›`
-where the value is not already matched as a GitLab token. Redacted: the token. Kept:
+**RC-2 — `bearer-token`.** Keyed: `Authorization: Bearer ‹token›`; `PRIVATE-TOKEN: ‹token›` where
+the value is not already matched as a GitLab token; and `access_token`, `refresh_token`, `id_token`
+and `auth_token` as an assignment or a JSON member, which is how an OAuth response, a `gcloud` dump
+and a Docker config actually spell a bearer token. Redacted: the token. Kept:
 `Authorization: Bearer [REDACTED]` — the scheme is the knowledge.
 
 **RC-3 — `jwt`.** Value-shaped: three base64url segments separated by dots, the first beginning
@@ -99,15 +108,21 @@ component only. Kept: scheme, user, host, port, path — a connection string wit
 is still the knowledge of which database was involved.
 
 **RC-12 — `dotenv-value`.** Keyed by name shape: an assignment whose key ends in `_TOKEN`, `_SECRET`,
-`_KEY`, `_PASSWORD`, `_PASS`, `_CREDENTIALS` or equals `TOKEN`/`SECRET`, in a `.env`-style line or
+`_KEY`, `_PASSWORD`, `_PASS`, `_CREDENTIALS` or equals `TOKEN`, `SECRET` or `PASSWORD`, in a
+`.env`-style line or
 its quoted form. Kept: the key name, which is usually what makes the line worth keeping. Must not
 match: a key ending in `_KEY` whose value is a placeholder or a variable reference, or a
 non-assignment mention of the name in prose.
 
-**RC-13 — `kubernetes-secret`.** Keyed by manifest: within a text containing `kind: Secret`, the
-values under `data:` and `stringData:`; and the value in
+**RC-13 — `kubernetes-secret`.** Scoped by mapping: the values under a `data:` or `stringData:` key
+whose **own enclosing mapping** declares `kind: Secret`; and the value in
 `kubectl create secret ‹…› --from-literal=‹key›=‹value›`. Kept: the kind, the metadata, the keys.
-Must not match: a `data:` block in a manifest that is not a Secret — a ConfigMap keeps its values.
+Must match, because it is how a Secret usually reaches a conversation at all: the `v1/List` form that
+`kubectl get secrets -o yaml` emits, where `kind: Secret` is indented inside a list item; a manifest
+with CRLF line endings, as a pasted Windows file has; `kind: "Secret"` and `kind: Secret # comment`.
+Must not match: a `data:` block whose mapping is not a Secret — a ConfigMap keeps its values,
+**including a ConfigMap in another document or another list item of the same text** — a `data:` key
+nested under some other key, and a Secret's own `metadata:` values.
 
 ## What a conforming implementation must ship with
 

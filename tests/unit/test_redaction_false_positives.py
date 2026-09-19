@@ -47,6 +47,18 @@ UNTOUCHED = {
         "  logLevel: aW5mbw==\n"
     ),
     "a short sk word": "we wrote sk-notes in the shared doc",
+    # The five below are the shapes a review found redacted into syntactically broken code. A
+    # redaction that breaks the line destroys the context §13 exists to protect, which makes it
+    # worse than an ordinary false positive.
+    "a getenv call": 'api_key = os.getenv("OPENAI_API_KEY")',
+    "a subscript": 'password = os.environ["DB_PASSWORD"]',
+    "a function call": "const apiKey = getApiKey();",
+    "a type declaration": "interface Credentials {\n  username: string;\n  password: string;\n}",
+    "a sql column type": "ALTER TABLE users ADD COLUMN password varchar(72) NOT NULL;",
+    "a configmap beside a secret": (
+        "kind: ConfigMap\ndata:\n  greeting: SGVsbG8gd29ybGQhIQ==\n---\nkind: Secret\nmetadata:\n"
+        "  name: unrelated\n"
+    ),
     "an aws arn": "arn:aws:s3:::hermes-archive/chatgpt/2026/03/04",
     "a forty character base64 word": "the digest was wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEYX",
     "an example dsn without credentials": "postgresql://db.internal:5432/hermes is the DSN",
