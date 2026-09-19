@@ -12,8 +12,22 @@ from datetime import UTC, datetime
 import pytest
 
 from hermes_memory.ingestion import ImportStatus, SourceConversation
-from hermes_memory.memory.interface import MemoryStore
-from hermes_memory.normalization import ProjectTag, Source
+from hermes_memory.memory.interface import MemoryStore, RecallResult
+from hermes_memory.normalization import (
+    AnyTag,
+    Conversation,
+    EnrichedConversation,
+    Message,
+    ProjectTag,
+    Role,
+    Source,
+    ToolActivity,
+)
+from hermes_memory.sanitization import (
+    PatternSecretSanitizer,
+    RedactionReport,
+    SecretSanitizer,
+)
 from tests.contracts import conversations
 from tests.fakes.archive import InMemoryRawArchive
 from tests.fakes.classifier import InMemoryProjectClassifier
@@ -22,6 +36,7 @@ from tests.fakes.source import InMemoryConversationSource
 from tests.fakes.state import InMemoryImportState
 from tests.fakes.store import InMemoryMemoryStore, TagIndexedMemoryStore
 from tests.integration.pipeline import Pipeline
+from tests.synthetic.secrets import CONTRACT_SAMPLE
 
 NOW = datetime(2026, 9, 16, 10, 0, tzinfo=UTC)
 read = conversations.as_read
@@ -309,3 +324,91 @@ def test_pl4_a_failure_that_concerns_no_conversation_is_still_reported(no_io: No
     assert len(outcome.failed) == 1
     assert outcome.failed[0].source_id == "<export>"
     assert outcome.failed[0].retryable is True
+
+
+# --- FR-017: nothing reaches the memory store without passing through the sanitizer -------------
+#
+# Written with the **real** sanitizer rather than the fake, which is what makes it a statement about
+# #11 instead of about `InMemorySecretSanitizer`. #19 composes the pipeline for real and inherits
+# both of these tests, and with them the ordering constraint §7 states in prose.
+
+
+class RecordingMemoryStore:
+    """Keeps everything it was handed, so a test can assert over all of it.
+
+    Not a fake of the boundary's behaviour — `recall` returns nothing — but a witness: the question
+    is what the store *received*, including the provenance and the tags, not what it can find.
+    """
+
+    def __init__(self) -> None:
+        self.received: list[EnrichedConversation] = []
+
+    def retain(self, enriched: EnrichedConversation) -> None:
+        self.received.append(enriched)
+
+    def recall(
+        self, query: str, tags: tuple[AnyTag, ...] = (), limit: int | None = None
+    ) -> tuple[RecallResult, ...]:
+        return ()
+
+    def everything_it_saw(self) -> str:
+        return "\n".join(enriched.model_dump_json() for enriched in self.received)
+
+
+class PassThroughSanitizer:
+    """A sanitizer that redacts nothing. It exists to be caught by the guard below."""
+
+    def sanitize(self, conversation: Conversation) -> tuple[Conversation, RedactionReport]:
+        return conversation, RedactionReport()
+
+
+def a_conversation_carrying_a_real_shaped_secret() -> Conversation:
+    sample = CONTRACT_SAMPLE
+    return Conversation(
+        source=Source.CHATGPT,
+        source_id="leaky-real",
+        title=f"401 from {sample.value}",
+        started_at=conversations.STARTED_AT,
+        messages=(
+            Message(
+                role=Role.ASSISTANT,
+                text=sample.sentence,
+                sent_at=conversations.STARTED_AT,
+                tool_activity=(
+                    ToolActivity(name="http", request=f"PRIVATE-TOKEN: {sample.value}"),
+                ),
+            ),
+        ),
+    )
+
+
+def run_with(sanitizer: SecretSanitizer, store: RecordingMemoryStore) -> None:
+    Pipeline(
+        source=InMemoryConversationSource(read(a_conversation_carrying_a_real_shaped_secret())),
+        sanitizer=sanitizer,
+        classifier=InMemoryProjectClassifier({"gitlab": "hermes-memory"}),
+        archive=InMemoryRawArchive(),
+        store=store,
+        state=InMemoryImportState(),
+    ).run(now=NOW)
+
+
+def test_the_memory_store_never_sees_a_secret(no_io: None) -> None:
+    """FR-017. The archive still holds the original — that is Principle I, not a leak."""
+    store = RecordingMemoryStore()
+
+    run_with(PatternSecretSanitizer(), store)
+
+    assert store.received, "the conversation never reached the store, so this proves nothing"
+    assert CONTRACT_SAMPLE.value not in store.everything_it_saw()
+    assert "returned HTTP 401 Unauthorized" in store.everything_it_saw()
+
+
+def test_that_guard_bites_when_sanitization_is_taken_out(no_io: None) -> None:
+    """SC-006: a guard that cannot fail proves nothing about the order of §7's stages."""
+    store = RecordingMemoryStore()
+
+    run_with(PassThroughSanitizer(), store)
+
+    assert store.received
+    assert CONTRACT_SAMPLE.value in store.everything_it_saw()

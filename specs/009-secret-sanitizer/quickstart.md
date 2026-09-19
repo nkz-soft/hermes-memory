@@ -16,8 +16,9 @@ uv sync
 uv run pytest tests/contracts/test_pattern_sanitizer_passes_the_contract.py -v -rs
 ```
 
-Expected: the eight rules SS-1 to SS-8 pass, with SS-8 running rather than skipped — the real
-sanitizer can be made to fail, so `make_failing_sanitizer` returns one.
+Expected: 9 passed, 0 skipped — the eight rules SS-1 to SS-8 plus the check that no hook would skip
+one. SS-8 runs because the failing sanitizer is the real class handed a pattern that cannot be
+applied, which is the defect the error translation exists for.
 
 ## 2. Thirteen categories, thirteen fixtures (SC-001)
 
@@ -25,10 +26,12 @@ sanitizer can be made to fail, so `make_failing_sanitizer` returns one.
 uv run pytest tests/unit/test_redaction_patterns.py -v
 ```
 
-Expected: one passing test per §13 category — API key, bearer token, JWT, GitHub, GitLab,
-Anthropic, OpenAI, AWS, private key, password, connection string, `.env` value, Kubernetes secret —
-each asserting both that the value is gone and that the words around it survive, plus the test that
-every declared category has at least one pattern.
+Expected: 70 passed. Three assertions per §13 category — the value is gone, the words around it
+survive, and the report names that category — across all thirteen: API key, bearer token, JWT,
+GitHub, GitLab, Anthropic, OpenAI, AWS, private key, password, connection string, `.env` value,
+Kubernetes secret. Plus the table-level checks: every declared category has at least one pattern,
+every sample is matched by a pattern of its own category, and the credential-shaped canary of #6's
+logging redaction is redacted here too.
 
 ## 3. Ordinary code and prose are untouched (SC-002)
 
@@ -36,24 +39,35 @@ every declared category has at least one pattern.
 uv run pytest tests/unit/test_redaction_false_positives.py -v
 ```
 
-Expected: zero redactions over commit SHAs, UUIDs, hex digests, base64 fragments,
+Expected: 23 passed — zero redactions over commit SHAs, UUIDs, hex digests, base64 fragments,
 `Authorization: Bearer $TOKEN`, `<your-api-key>`, `password` as a word, `PASSWORD=$DB_PASSWORD`, a
-ConfigMap `data:` block and a dotted version string.
+ConfigMap `data:` block, an ARN, a dotted version string and the rest, each asserted to come back
+**equal** to the input rather than merely secret-free.
 
-## 4. Overlaps, repeats, idempotence and hostile input (SC-005)
+## 4. Overlaps, repeats, idempotence and the report (SC-004, SC-005)
 
 ```bash
-uv run pytest tests/unit/test_redaction_scanner.py -v
+uv run pytest tests/unit/test_redaction_scanner.py tests/unit/test_redaction_report.py -v
 ```
 
-Expected: a JWT inside a bearer header is redacted once and counted once as a JWT; a value repeated
-twice is counted twice; sanitizing a sanitized conversation changes nothing and reports nothing; and
-each pattern finishes within the time bound on a long adversarial string.
+Expected: a value repeated twice is counted twice; a placeholder is left where it stands;
+`[REDACTED]` is not itself a secret, so sanitizing twice changes nothing and reports nothing; and
+the report's counts sum to the replacements made while quoting no value. The overlap that matters in
+practice — a JWT inside a bearer header, counted once as a JWT — is asserted in
+`tests/unit/test_redaction_patterns.py`.
+
+```bash
+uv run pytest tests/unit/test_redaction_cost.py -v
+```
+
+Expected: each pattern finishes within its bound on a long adversarial string, a manifest of a few
+hundred kilobytes is sanitized promptly, and ten times the text costs far less than a hundred times
+the work.
 
 ## 5. Nothing reaches the memory store unsanitized (SC-006)
 
 ```bash
-uv run pytest tests/integration/test_pipeline_from_fakes.py -v -k sanitiz
+uv run pytest tests/integration/test_pipeline_from_fakes.py -v -k "secret or sanitiz"
 ```
 
 Expected: with the real sanitizer composed into the harness, the recording memory store never saw
@@ -74,8 +88,11 @@ module.
 
 ## 7. By hand, on a string you make up (optional)
 
+The token is assembled rather than written out, so that no line of this repository carries a
+credential-shaped literal for a scanner — or a reader — to mistake for one.
+
 ```bash
-uv run python -c "from hermes_memory.sanitization import PatternSecretSanitizer as S; print(S().redact_text('GitLab request using token glpat-0000000000000000000A returned HTTP 401 Unauthorized')[0])"
+uv run python -c "from hermes_memory.sanitization import PatternSecretSanitizer as S; t='glpat-'+'0'*19+'A'; print(S().redact_text(f'GitLab request using token {t} returned HTTP 401 Unauthorized')[0])"
 ```
 
 Expected: `GitLab request using token [REDACTED] returned HTTP 401 Unauthorized` — §13's example,

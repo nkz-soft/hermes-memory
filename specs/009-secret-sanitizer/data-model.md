@@ -29,8 +29,16 @@ One entry in the table.
 | `category` | the `RedactionCategory` a match is reported under |
 | `expression` | the compiled expression; every quantifier bounded, none nested (research R2) |
 | `value_group` | which group holds the value to replace — the whole match for a value-shaped pattern, a named group for a keyed one or a block body |
-| `precedence` | position in the table; lower wins an overlap (RR-6) |
 | `minimum_length` | below which a matched value is treated as a placeholder (RR-7) |
+| `requires` | an optional guard the surrounding text must satisfy before the pattern applies |
+
+Precedence is **not** a field: it is the entry's position in the sequence handed to the scanner, so
+the table cannot disagree with itself about which of two patterns is the more specific (RR-6).
+
+`requires` exists for one category. What makes a base64 line a Kubernetes secret is the
+`kind: Secret` above it, and a regular expression cannot look arbitrarily far behind its own match;
+without the guard, the same pattern would empty every ConfigMap quoted in a conversation
+(research R7).
 
 **Rules**: the table is built once at import and is immutable. Two patterns may share a category —
 the AWS id and the AWS secret do (RC-8), and the vendor prefixes each have several spellings. No
