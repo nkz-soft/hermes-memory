@@ -48,6 +48,8 @@ def find_spans(text: str, patterns: Sequence[Pattern]) -> list[Span]:
     """
     spans: list[Span] = []
     for precedence, pattern in enumerate(patterns):
+        if pattern.requires is not None and not pattern.requires.search(text):
+            continue
         for match in pattern.expression.finditer(text):
             value = match.group(pattern.value_group)
             if value is None or len(value) < pattern.minimum_length or is_placeholder(value):
