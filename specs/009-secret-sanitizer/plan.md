@@ -72,7 +72,7 @@ no history source is added. The §13 category vocabulary is consumed as #9 fixed
 
 **Gate result: PASS.** No deviation to justify; Complexity Tracking is therefore empty and omitted.
 
-**Re-check after Phase 1 design: PASS.** The design adds four modules inside `sanitization` and no
+**Re-check after Phase 1 design: PASS.** The design adds three modules inside `sanitization` and no
 public type beyond `PatternSecretSanitizer`. Two consequences are recorded rather than hidden.
 First, R7's known limit: a Kubernetes `data:` block quoted without its `kind: Secret` line and with
 neutral key names is not recognized, and no pattern can tell it from a ConfigMap. Second, R1's
@@ -132,18 +132,23 @@ src/hermes_memory/sanitization/
 
 tests/
 ├── unit/
-│   ├── test_redaction_patterns.py      # a fixture per §13 category (SC-001)
-│   ├── test_redaction_false_positives.py  # ordinary code and prose (SC-002)
-│   ├── test_redaction_scanner.py       # overlap, repeats, idempotence, adversarial input (R2, R4)
-│   └── test_pattern_sanitizer.py       # the conversation traversal, identity, report
+│   ├── test_redaction_patterns.py         # three assertions per §13 category (SC-001)
+│   ├── test_redaction_context.py          # §13's example and every "kept" clause (RR-2)
+│   ├── test_redaction_false_positives.py  # ordinary code and prose, asserted equal (SC-002)
+│   ├── test_redaction_scanner.py          # spans, overlap, repeats, placeholders (R4, RR-7)
+│   ├── test_redaction_report.py           # counts, absence of a zero, idempotence (SC-004, SC-005)
+│   ├── test_redaction_cost.py             # adversarial input and a large field (R2, R12)
+│   ├── test_sanitizer_is_quiet.py         # the boundary emits no log event (R8)
+│   └── test_pattern_sanitizer.py          # the conversation traversal, identity, report
 ├── structure/
-│   └── test_sanitizer_covers_the_model.py  # every text-bearing field of #8 is visited (R1)
+│   ├── test_sanitizer_covers_the_model.py # every field of #8 is scanned or copied (R1, RR-3)
+│   └── test_sanitization_imports.py       # no Hindsight, network, storage — or logging
 ├── contracts/
-│   └── test_pattern_sanitizer_passes_the_contract.py  # #9's SS-1..SS-8
+│   └── test_pattern_sanitizer_passes_the_contract.py  # #9's SS-1..SS-8, none skipped
 ├── synthetic/
-│   └── secrets.py                      # synthesized samples per category (R11)
+│   └── secrets.py                         # synthesized samples per category (R11)
 └── integration/
-    └── test_pipeline_from_fakes.py     # extended: the guard and its bite (FR-017, R10)
+    └── test_pipeline_from_fakes.py        # extended: the guard and its bite (FR-017, R10)
 ```
 
 **Structure Decision**: the constitution's module tree fixes `sanitization`; this feature fills it.
